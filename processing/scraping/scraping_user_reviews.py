@@ -1,6 +1,7 @@
+import uuid
+
 import requests
 from bs4 import BeautifulSoup
-import uuid
 
 class ScrapingUserReviews:
 
@@ -38,12 +39,11 @@ class ScrapingUserReviews:
         reviews = response.findAll("li", attrs={"class": "poster-container"})
 
         # Create empty array to store list of bulk operations or rating objects
-        ratings_operations = []
-        movie_operations = []
+        ratings = []
 
         # For each review, parse data from scraped page and append an UpdateOne operation for bulk execution or a rating object
         for review in reviews:
-            movie_id = review.find("div", attrs={"class", "film-poster"})["data-target-link"].split("/")[-2]
+            movie_title = review.find("div", attrs={"class", "film-poster"})["data-target-link"].split("/")[-2]
 
             rating = review.find("span", attrs={"class": "rating"})
             if not rating:
@@ -55,17 +55,15 @@ class ScrapingUserReviews:
                 rating_class = rating["class"][-1]
                 rating_val = int(rating_class.split("-")[-1])
 
-            rating_object = {"movie_id": movie_id, "rating_val": rating_val, "user_id": user_id, }
+            rating_object = {"movie_title": movie_title, "rating_val": rating_val, "user_id": user_id}
+            ratings.append(rating_object)
 
             # We're going to eventually send a bunch of upsert operations for movies with just IDs
             # For movies already in the database, this won't impact anything
             # But this will allow us to easily figure out which movies we need to scraped data on later,
             # Rather than scraping data for hundreds of thousands of movies everytime there's a broader data update
-            skeleton_movie_object = {"movie_id": movie_id}
 
-            ratings_operations.append(rating_object)
-
-        return ratings_operations, movie_operations
+        return ratings
 
     def get_user_ratings(self, username, user_id, store_in_db=True, num_pages=1, return_unrated=False):
         scrape_responses = []
@@ -76,20 +74,12 @@ class ScrapingUserReviews:
             scrape_responses.append(soup)
 
         # Process each ratings page response, converting it into bulk upsert operations or output dicts
-        parse_responses = []
+        ratings = []
         for response in scrape_responses:
             task = self.generate_ratings_operations(response, user_id, return_unrated=return_unrated)
-            parse_responses.append(task)
+            ratings += task
 
-        # Concatenate each response's upsert operations/output dicts
-        upsert_ratings_operations = []
-        upsert_movies_operations = []
-
-        for response in parse_responses:
-            upsert_ratings_operations += response[0]
-            upsert_movies_operations += response[1]
-
-        return upsert_ratings_operations, upsert_movies_operations
+        return ratings
 
     def get_page_count(self, username):
 
@@ -121,3 +111,14 @@ class ScrapingUserReviews:
         user_ratings = [x for x in result[0] if x["rating_val"] >= 0]
 
         return user_ratings
+
+
+if __name__ == "__main__":
+
+    # Reviews & Users Scraping
+
+    scraping_user_reviews = ScrapingUserReviews()
+    top_users = scraping_user_reviews.get_popular_users()[0:2]
+
+    for user in top_users:
+        print(scraping_user_reviews.get_user_ratings(user['username'], user['user_id']))

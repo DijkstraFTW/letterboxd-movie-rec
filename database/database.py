@@ -16,7 +16,6 @@ class MongoDBClient:
             self.cluster) + "/?retryWrites=true&w=majority"
 
     def open_conn_to_db(self):
-
         try:
             client = MongoClient(self.URI, tlsCAFile=certifi.where())
             client.admin.command('ping')
@@ -27,7 +26,6 @@ class MongoDBClient:
             return None
 
     def close_conn_to_db(self, client):
-
         try:
             client.close()
             print("Successfully disconnected to MongoDB instance!")
@@ -39,7 +37,7 @@ class MongoDBClient:
     def insert_movies(self, client, movies):
         try:
             collection = client[str(self.database)].movies
-            for movie in movies :
+            for movie in movies:
                 collection.insert_one(movie)
         except Exception as e:
             print("Error adding movies to MongoDB : " + str(e))
@@ -47,10 +45,20 @@ class MongoDBClient:
     def insert_ratings(self, client, ratings):
         try:
             collection = client[str(self.database)].ratings
-            for rating in ratings :
+            for rating in ratings:
                 collection.insert_one(rating)
         except Exception as e:
             print("Error adding ratings to MongoDB : " + str(e))
+
+    def read_all_rated_movies(self, client):
+        try:
+            collection = client[str(self.database)].ratings
+            result = collection.find()
+
+            return [item["movie_title"] for item in result]
+        except Exception as e:
+            print("Error reading all movies from MongoDB: " + str(e))
+            return []
 
     def insert_users(self, client, users):
         try:
