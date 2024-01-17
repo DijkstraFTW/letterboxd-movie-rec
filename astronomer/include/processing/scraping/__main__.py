@@ -1,8 +1,8 @@
 from dotenv import load_dotenv
 
-from database.database import MongoDBClient
-from processing.scraping.scraping_movies import ScrapingMovies
-from processing.scraping.scraping_user_reviews import ScrapingUserReviews
+from astronomer.include.database.database import MongoDBClient
+from astronomer.include.processing.scraping.scraping_movies import ScrapingMovies
+from astronomer.include.processing.scraping.scraping_user_reviews import ScrapingUserReviews
 
 if __name__ == "__main__":
 

@@ -4,7 +4,6 @@ import certifi
 from dotenv import load_dotenv
 from pymongo import MongoClient
 
-
 class MongoDBClient:
 
     def __init__(self):
@@ -39,6 +38,7 @@ class MongoDBClient:
             collection = client[str(self.database)].movies
             for movie in movies:
                 collection.insert_one(movie)
+            print("Successfully added {} movies to MongoDB instance!".format(len(movies)))
         except Exception as e:
             print("Error adding movies to MongoDB : " + str(e))
 
@@ -47,6 +47,7 @@ class MongoDBClient:
             collection = client[str(self.database)].ratings
             for rating in ratings:
                 collection.insert_one(rating)
+            print("Successfully added {} ratings to MongoDB instance!".format(len(ratings)))
         except Exception as e:
             print("Error adding ratings to MongoDB : " + str(e))
 
@@ -54,7 +55,6 @@ class MongoDBClient:
         try:
             collection = client[str(self.database)].ratings
             result = collection.find()
-
             return [item["movie_title"] for item in result]
         except Exception as e:
             print("Error reading all movies from MongoDB: " + str(e))
@@ -63,15 +63,11 @@ class MongoDBClient:
     def insert_users(self, client, users):
         try:
             collection = client[str(self.database)].users
-            for user in users :
+            for user in users:
                 collection.insert_one(user)
+            print("Successfully added {} users to MongoDB instance!".format(len(users)))
         except Exception as e:
             print("Error adding users to MongoDB : " + str(e))
-
-
-
-
-
 
 
 if __name__ == "__main__":

@@ -4,14 +4,13 @@ from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from dotenv import load_dotenv
 
-from database.database import MongoDBClient
-from processing.scraping.scraping_movies import ScrapingMovies
-from processing.scraping.scraping_user_reviews import ScrapingUserReviews
+from include.database.database import *
+from include.processing.scraping.scraping_movies import *
+from include.processing.scraping.scraping_user_reviews import *
 
 load_dotenv()
 
-default_args = {'owner': 'airflow', 'start_date': datetime(2024, 1, 1), 'depends_on_past': False, 'retries': 1,
-    'retry_delay': timedelta(minutes=5), }
+default_args = {'owner': 'airflow', 'start_date': datetime.datetime(2024, 1, 1), 'depends_on_past': False, 'retries': 1, 'retry_delay': timedelta(minutes=5)}
 
 dag = DAG(
     'letterboxd_scrapping_dag',
@@ -47,7 +46,7 @@ def scraping_movies_shows():
     movies_list = mongodb.read_all_rated_movies(client)
 
     scraping_movies = ScrapingMovies(movies_list)
-    letterboxd_movies = scraping_movies.get_movies()[0:2]
+    letterboxd_movies = scraping_movies.get_movies()
 
     movies_data = []
 
@@ -62,7 +61,7 @@ def scraping_movies_shows():
 
 
 task_scraping_movies_shows = PythonOperator(task_id='scraping_movies_shows', python_callable=scraping_movies_shows,
-    dag=dag, )
+    dag=dag)
 
 # Task dependencies
 task_scraping_users_reviews >> task_scraping_movies_shows
