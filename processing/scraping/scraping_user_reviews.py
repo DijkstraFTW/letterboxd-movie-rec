@@ -21,7 +21,6 @@ class ScrapingUserReviews:
             table = soup.find("table", attrs={"class": "person-table"})
             rows = table.findAll("td", attrs={"class": "table-person"})
 
-            update_operations = []
             for row in rows:
                 user_id = str(uuid.uuid4())
                 link = row.find("a")["href"]
@@ -68,26 +67,6 @@ class ScrapingUserReviews:
 
         return ratings_operations, movie_operations
 
-    def get_page_count(self, username):
-
-        response = requests.get(self.users_page_number_url.format(username))
-        soup = BeautifulSoup(response.text, features="html.parser")
-        body = soup.find("body")
-
-        if "error" in body["class"]:
-            return -1, None
-
-        try:
-            page_link = soup.findAll("li", attrs={"class", "paginate-page"})[-1]
-            num_pages = int(page_link.find("a").text.replace(",", ""))
-            display_name = (body.find("section", attrs={"class": "profile-header"}).find("h1", attrs={
-                "class": "title-3"}).text.strip())
-        except IndexError:
-            num_pages = 1
-            display_name = None
-
-        return num_pages, display_name
-
     def get_user_ratings(self, username, user_id, store_in_db=True, num_pages=1, return_unrated=False):
         scrape_responses = []
 
@@ -112,13 +91,33 @@ class ScrapingUserReviews:
 
         return upsert_ratings_operations, upsert_movies_operations
 
+    def get_page_count(self, username):
+
+        response = requests.get(self.users_page_number_url.format(username))
+        soup = BeautifulSoup(response.text, features="html.parser")
+        body = soup.find("body")
+
+        if "error" in body["class"]:
+            return -1, None
+
+        try:
+            page_link = soup.findAll("li", attrs={"class", "paginate-page"})[-1]
+            num_pages = int(page_link.find("a").text.replace(",", ""))
+            display_name = (body.find("section", attrs={"class": "profile-header"}).find("h1", attrs={
+                "class": "title-3"}).text.strip())
+        except IndexError:
+            num_pages = 1
+            display_name = None
+
+        return num_pages, display_name
+
     def get_user_data(self, username, data_opt_in=False):
         num_pages, display_name = self.get_page_count(username)
 
         if num_pages == -1:
             return [], "user_not_found"
 
-        result = self.get_user_ratings(username, store_in_db=False, num_pages=num_pages, return_unrated=True, )
+        result = self.get_user_ratings(username, store_in_db=False, num_pages=num_pages, return_unrated=True)
         user_ratings = [x for x in result[0] if x["rating_val"] >= 0]
 
         return user_ratings
