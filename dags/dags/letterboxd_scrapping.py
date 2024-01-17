@@ -1,17 +1,28 @@
+from datetime import datetime, timedelta
+
+from airflow import DAG
+from airflow.operators.python_operator import PythonOperator
 from dotenv import load_dotenv
 
 from database.database import MongoDBClient
 from processing.scraping.scraping_movies import ScrapingMovies
 from processing.scraping.scraping_user_reviews import ScrapingUserReviews
 
-if __name__ == "__main__":
+load_dotenv()
 
-    load_dotenv()
+default_args = {'owner': 'airflow', 'start_date': datetime(2024, 1, 1), 'depends_on_past': False, 'retries': 1,
+    'retry_delay': timedelta(minutes=5), }
 
-    # Reviews & Users Scraping
+dag = DAG(
+    'letterboxd_scrapping_dag',
+    default_args=default_args,
+    schedule_interval='0 3 1 * *'
+)
 
+# Scraping Users and Reviews
+def scraping_users_reviews():
     scraping_user_reviews = ScrapingUserReviews()
-    top_users = scraping_user_reviews.get_popular_users()[0:2]
+    top_users = scraping_user_reviews.get_popular_users()
 
     mongodb = MongoDBClient()
     client = mongodb.open_conn_to_db()
@@ -23,8 +34,13 @@ if __name__ == "__main__":
 
     mongodb.close_conn_to_db(client)
 
-    # Movies & Shows Scraping
 
+task_scraping_users_reviews = PythonOperator(task_id='scraping_users_reviews', python_callable=scraping_users_reviews,
+    dag=dag, )
+
+
+# Scraping Movies and Shows
+def scraping_movies_shows():
     mongodb = MongoDBClient()
     client = mongodb.open_conn_to_db()
 
@@ -43,3 +59,10 @@ if __name__ == "__main__":
 
     mongodb.insert_movies(client, movies_data)
     mongodb.close_conn_to_db(client)
+
+
+task_scraping_movies_shows = PythonOperator(task_id='scraping_movies_shows', python_callable=scraping_movies_shows,
+    dag=dag, )
+
+# Task dependencies
+task_scraping_users_reviews >> task_scraping_movies_shows
