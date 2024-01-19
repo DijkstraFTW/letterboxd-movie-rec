@@ -43,9 +43,14 @@ class ScrapingMovies:
             themoviedb_id = themoviedb_link.split('/movie')[1].strip('/').split('/')[0]
             type = "movie"
         except:
-            themoviedb_link = soup.find("a", attrs={"data-track-action": "TMDb"})['href']
-            themoviedb_id = themoviedb_link.split('/tv')[1].strip('/').split('/')[0]
-            type = "tv"
+            try:
+                themoviedb_link = soup.find("a", attrs={"data-track-action": "TMDb"})['href']
+                themoviedb_id = themoviedb_link.split('/tv')[1].strip('/').split('/')[0]
+                type = "tv"
+            except TypeError :
+                themoviedb_link = ""
+                themoviedb_id = ""
+                type = "none"
 
         movie_object = {"movie_title_formatted": movie_title_format, "movie_title": movie_title, "type": type, "year_released": year,
             "imdb_link": imdb_link, "tmdb_link": themoviedb_link, "imdb_id": imdb_id, "tmdb_id": themoviedb_id}
@@ -107,4 +112,6 @@ class ScrapingMovies:
         return movie_object
 
     def get_rich_data(self, movie, type):
-        return dict(self.fetch_themoviedb_data(self.themoviedb_url.format(type, movie["tmdb_id"], self.themoviedb_key)))
+        if type != "none":
+            return dict(self.fetch_themoviedb_data(self.themoviedb_url.format(type, movie["tmdb_id"], self.themoviedb_key)))
+        return {}

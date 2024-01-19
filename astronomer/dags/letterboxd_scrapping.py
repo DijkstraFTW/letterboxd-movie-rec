@@ -54,7 +54,8 @@ def scraping_movies_shows():
         posters = scraping_movies.get_movie_posters(movie)
         themoviedb = scraping_movies.get_rich_data(movie, movie["type"])
         combined_movie_item = {**movie, **posters, **themoviedb}
-        movies_data.append(combined_movie_item)
+        if (combined_movie_item["type"] != "none"):
+            movies_data.append(combined_movie_item)
 
     mongodb.insert_movies(client, movies_data)
     mongodb.close_conn_to_db(client)
