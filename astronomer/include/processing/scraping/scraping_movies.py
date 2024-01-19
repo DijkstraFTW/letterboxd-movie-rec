@@ -62,6 +62,7 @@ class ScrapingMovies:
         for movie in self.movies_list:
             task = self.fetch_letterboxd(self.movies_url.format(movie), movie)
             tasks.append(task)
+        tasks = list(set(tasks))
         return tasks
 
     def fetch_poster(self, url):
