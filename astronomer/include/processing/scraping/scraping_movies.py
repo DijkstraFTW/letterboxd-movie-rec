@@ -47,7 +47,7 @@ class ScrapingMovies:
                 themoviedb_link = soup.find("a", attrs={"data-track-action": "TMDb"})['href']
                 themoviedb_id = themoviedb_link.split('/tv')[1].strip('/').split('/')[0]
                 type = "tv"
-            except TypeError :
+            except:
                 themoviedb_link = ""
                 themoviedb_id = ""
                 type = "none"
@@ -62,7 +62,6 @@ class ScrapingMovies:
         for movie in self.movies_list:
             task = self.fetch_letterboxd(self.movies_url.format(movie), movie)
             tasks.append(task)
-        tasks = list(set(tasks))
         return tasks
 
     def fetch_poster(self, url):

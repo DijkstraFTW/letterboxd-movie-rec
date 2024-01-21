@@ -51,11 +51,12 @@ class MongoDBClient:
         except Exception as e:
             print("Error adding ratings to MongoDB : " + str(e))
 
-    def read_all_rated_movies(self, client):
+    def read_all_ratings(self, client):
         try:
             collection = client[str(self.database)].ratings
             result = collection.find()
-            return [item["movie_title"] for item in result]
+            result = [item["movie_title"] for item in result]
+            return list(set(result))
         except Exception as e:
             print("Error reading all movies from MongoDB: " + str(e))
             return []

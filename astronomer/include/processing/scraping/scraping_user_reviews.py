@@ -12,7 +12,7 @@ class ScrapingUserReviews:
 
     def get_popular_users(self):
 
-        total_pages = 128
+        total_pages = 50
         users = []
 
         for page in range(total_pages):
@@ -65,7 +65,7 @@ class ScrapingUserReviews:
 
         return ratings
 
-    def get_user_ratings(self, username, user_id, store_in_db=True, num_pages=10, return_unrated=False):
+    def get_user_ratings(self, username, user_id, store_in_db=True, num_pages=4, return_unrated=False):
         scrape_responses = []
 
         for i in range(num_pages):

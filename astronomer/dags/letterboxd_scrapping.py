@@ -43,7 +43,7 @@ def scraping_movies_shows():
     mongodb = MongoDBClient()
     client = mongodb.open_conn_to_db()
 
-    movies_list = mongodb.read_all_rated_movies(client)
+    movies_list = mongodb.read_all_ratings(client)
 
     scraping_movies = ScrapingMovies(movies_list)
     letterboxd_movies = scraping_movies.get_movies()
