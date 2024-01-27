@@ -12,7 +12,7 @@ class ScrapingUserReviews:
 
     def get_popular_users(self):
 
-        total_pages = 50
+        total_pages = 100
         users = []
 
         for page in range(total_pages):
@@ -43,7 +43,7 @@ class ScrapingUserReviews:
 
         # For each review, parse data from scraped page and append an UpdateOne operation for bulk execution or a rating object
         for review in reviews:
-            movie_title = review.find("div", attrs={"class", "film-poster"})["data-target-link"].split("/")[-2]
+            movie_title = review.find("div", attrs={"class", "film-poster"})["data-film-slug"]
 
             rating = review.find("span", attrs={"class": "rating"})
             if not rating:
@@ -65,7 +65,7 @@ class ScrapingUserReviews:
 
         return ratings
 
-    def get_user_ratings(self, username, user_id, store_in_db=True, num_pages=4, return_unrated=False):
+    def get_user_ratings(self, username, user_id, store_in_db=True, num_pages=10, return_unrated=False):
         scrape_responses = []
 
         for i in range(num_pages):
@@ -111,14 +111,3 @@ class ScrapingUserReviews:
         user_ratings = [x for x in result[0] if x["rating_val"] >= 0]
 
         return user_ratings
-
-
-if __name__ == "__main__":
-
-    # Reviews & Users Scraping
-
-    scraping_user_reviews = ScrapingUserReviews()
-    top_users = scraping_user_reviews.get_popular_users()[0:2]
-
-    for user in top_users:
-        print(scraping_user_reviews.get_user_ratings(user['username'], user['user_id']))
