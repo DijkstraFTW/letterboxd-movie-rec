@@ -4,9 +4,9 @@ from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from dotenv import load_dotenv
 
-from include.database.database import *
-from include.processing.scraping.scraping_movies import *
-from include.processing.scraping.scraping_user_reviews import *
+from include.database.MongoDBClient import *
+from include.processing.scraping.ScrapingMovies import *
+from include.processing.scraping.ScrapingUserReviews import *
 
 load_dotenv()
 
