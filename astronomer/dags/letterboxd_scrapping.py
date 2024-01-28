@@ -48,16 +48,13 @@ def scraping_movies_shows():
     scraping_movies = ScrapingMovies(movies_list)
     letterboxd_movies = scraping_movies.get_movies()
 
-    movies_data = []
-
     for movie in letterboxd_movies:
         posters = scraping_movies.get_movie_posters(movie)
         themoviedb = scraping_movies.get_rich_data(movie, movie["type"])
         combined_movie_item = {**movie, **posters, **themoviedb}
         if (combined_movie_item["type"] != "none"):
-            movies_data.append(combined_movie_item)
+            mongodb.insert_movies(client, combined_movie_item)
 
-    mongodb.insert_movies(client, movies_data)
     mongodb.close_conn_to_db(client)
 
 

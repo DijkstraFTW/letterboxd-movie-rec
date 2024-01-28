@@ -33,11 +33,10 @@ class MongoDBClient:
             print("Error disconnecting from MongoDB : " + str(e))
             return None
 
-    def insert_movies(self, client, movies):
+    def insert_movies(self, client, movie):
         try:
             collection = client[str(self.database)].movies
-            for movie in movies:
-                collection.insert_one(movie)
+            collection.insert_one(movie)
             print("Successfully added {} movies to MongoDB instance!".format(len(movies)))
         except Exception as e:
             print("Error adding movies to MongoDB : " + str(e))
