@@ -1,4 +1,6 @@
 import string
+import os
+import datetime
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 
@@ -37,8 +39,20 @@ def create_bag_of_words(x):
     return "".join(
         [overview, " ", movie_type, " ", genres, " ", production_countries, " ", spoken_languages, " ", runtime])
 
+def select_last_model(directory):
+    """
+    Selects the most recent collaborative filtering model
+    :rtype: object : path of the latest collaborative filtering model
+    """
 
-# TODO
-def select_last_model(str) :
+    list_of_files = os.listdir(directory)
 
-    return "best_model"
+    if not list_of_files:
+        return None
+    list_of_files = [file for file in list_of_files if file.endswith('.pkl')]
+
+    if not list_of_files:
+        return None
+
+    latest_model = max(list_of_files, key=lambda x: datetime.strptime(x.split('_')[-1].split('.')[0], "%Y%m%d%H%M%S"))
+    return os.path.join(directory, latest_model)

@@ -33,14 +33,6 @@ class MongoDBClient:
             print("Error disconnecting from MongoDB : " + str(e))
             return None
 
-    def insert_movies(self, client, movie):
-        try:
-            collection = client[str(self.database)].movies
-            collection.insert_one(movie)
-            print("Successfully added {} movies to MongoDB instance!".format(len(movies)))
-        except Exception as e:
-            print("Error adding movies to MongoDB : " + str(e))
-
     def insert_ratings(self, client, ratings):
         try:
             collection = client[str(self.database)].ratings
@@ -59,14 +51,22 @@ class MongoDBClient:
             print("Error reading all movies from MongoDB: " + str(e))
             return []
 
-    def read_all_movies_rated(self, client):
+    def insert_movies(self, client, movie):
+        try:
+            collection = client[str(self.database)].movies
+            collection.insert_one(movie)
+            print("Successfully added movie data to MongoDB instance!")
+        except Exception as e:
+            print("Error adding movies to MongoDB : " + str(e))
+
+    def read_all_rated_movies(self, client):
         try:
             collection = client[str(self.database)].ratings
             result = collection.find()
             result = [item["movie_title"] for item in result]
             return list(set(result))
         except Exception as e:
-            print("Error reading all movies from MongoDB: " + str(e))
+            print("Error reading all rated movies from MongoDB: " + str(e))
             return []
 
     def insert_users(self, client, users):

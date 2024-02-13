@@ -17,6 +17,8 @@ dag = DAG(
     schedule_interval='0 3 1 * *'
 )
 
+# TODO decompose each dag extract - transf - loading
+
 # Scraping Users and Reviews
 def scraping_users_reviews():
     scraping_user_reviews = ScrapingUserReviews()
@@ -42,16 +44,16 @@ def scraping_movies_shows():
     mongodb = MongoDBClient()
     client = mongodb.open_conn_to_db()
 
-    movies_list = mongodb.read_all_movies_rated(client)
+    movies_list = mongodb.read_all_rated_movies(client)
 
     scraping_movies = ScrapingMovies(movies_list)
-    letterboxd_movies = scraping_movies.get_movies()
+    letterboxd_movies = scraping_movies.get_rated_movies()
 
     for movie in letterboxd_movies:
         posters = scraping_movies.get_movie_posters(movie)
         themoviedb = scraping_movies.get_rich_data(movie, movie["type"])
         combined_movie_item = {**movie, **posters, **themoviedb}
-        if (combined_movie_item["type"] != "none"):
+        if combined_movie_item["type"] != "none":
             mongodb.insert_movies(client, combined_movie_item)
 
     mongodb.close_conn_to_db(client)

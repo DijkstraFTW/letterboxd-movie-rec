@@ -1,7 +1,9 @@
 import datetime
+import os
+
 import requests
 from bs4 import BeautifulSoup
-import os
+
 
 class ScrapingMovies:
 
@@ -13,7 +15,7 @@ class ScrapingMovies:
         self.empty_image_url_prefix = "https://s.ltrbxd.com/static/img/empty-poster"
         self.movies_list = movies_list
 
-    def fetch_letterboxd(self, url, movie_title_format):
+    def get_letterboxd_movies(self, url, movie_title_format):
 
         response = requests.get(url)
         soup = BeautifulSoup(response.text, features="html.parser")
@@ -52,19 +54,13 @@ class ScrapingMovies:
                 themoviedb_id = ""
                 type = "none"
 
-        movie_object = {"movie_title_formatted": movie_title_format, "movie_title": movie_title, "type": type, "year_released": year,
-            "imdb_link": imdb_link, "tmdb_link": themoviedb_link, "imdb_id": imdb_id, "tmdb_id": themoviedb_id}
+        movie_object = {"movie_title_formatted": movie_title_format, "movie_title": movie_title, "type": type,
+                        "year_released": year, "imdb_link": imdb_link, "tmdb_link": themoviedb_link, "imdb_id": imdb_id,
+                        "tmdb_id": themoviedb_id}
 
         return movie_object
 
-    def get_movies(self):
-        tasks = []
-        for movie in self.movies_list:
-            task = self.fetch_letterboxd(self.movies_url.format(movie), movie)
-            tasks.append(task)
-        return tasks
-
-    def fetch_poster(self, url):
+    def get_movie_poster(self, url):
 
         response = requests.get(url)
         soup = BeautifulSoup(response.text, features="html.parser")
@@ -78,29 +74,22 @@ class ScrapingMovies:
 
         return dict({"poster_url": image_url})
 
-    def get_movie_posters(self, movie):
-        return dict(self.fetch_poster(self.posters_url.format(movie["movie_title_formatted"])))
-
     def fetch_themoviedb_data(self, url):
 
         movie_object = {}
+        nested_fields = ["genres", "production_countries", "spoken_languages"]
+        simple_fields = ["popularity", "overview", "runtime", "vote_average", "vote_count", "release_date",
+                         "original_language"]
 
-        headers = {
-            "accept": "application/json",
-            "Authorization": "Bearer " + str(self.themoviedb_key)
-        }
-
+        headers = {"accept": "application/json", "Authorization": "Bearer " + str(self.themoviedb_key)}
         response = requests.get(url, headers=headers).json()
 
-        object_fields = ["genres", "production_countries", "spoken_languages"]
-        for field_name in object_fields:
+        for field_name in nested_fields:
             try:
                 movie_object[field_name] = [x["name"] for x in response[field_name]]
             except:
                 movie_object[field_name] = None
 
-        simple_fields = ["popularity", "overview", "runtime", "vote_average", "vote_count", "release_date",
-                         "original_language"]
         for field_name in simple_fields:
             try:
                 movie_object[field_name] = response[field_name]
@@ -111,7 +100,18 @@ class ScrapingMovies:
 
         return movie_object
 
+    def get_rated_movies(self):
+        result = []
+        for movie in self.movies_list:
+            movie_data = self.get_letterboxd_movies(self.movies_url.format(movie), movie)
+            result.append(movie_data)
+        return result
+
+    def get_movie_posters(self, movie):
+        return dict(self.get_movie_poster(self.posters_url.format(movie["movie_title_formatted"])))
+
     def get_rich_data(self, movie, type):
         if type != "none":
-            return dict(self.fetch_themoviedb_data(self.themoviedb_url.format(type, movie["tmdb_id"], self.themoviedb_key)))
+            return dict(
+                self.fetch_themoviedb_data(self.themoviedb_url.format(type, movie["tmdb_id"], self.themoviedb_key)))
         return {}

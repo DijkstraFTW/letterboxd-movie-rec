@@ -1,8 +1,8 @@
 from dotenv import load_dotenv
 
-from astronomer.include.database.MongoDBClient import MongoDBClient
+from database.MongoDBClient import MongoDBClient
 from processing.scraping.ScrapingMovies import ScrapingMovies
-from astronomer.include.processing.scraping.ScrapingUserReviews import ScrapingUserReviews
+from processing.scraping.ScrapingUserReviews import ScrapingUserReviews
 
 if __name__ == "__main__":
 
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     movies_list = mongodb.read_all_rated_movies(client)
 
     scraping_movies = ScrapingMovies(movies_list)
-    letterboxd_movies = scraping_movies.get_movies()[0:2]
+    letterboxd_movies = scraping_movies.get_rated_movies()[0:2]
 
     movies_data = []
 
@@ -39,7 +39,6 @@ if __name__ == "__main__":
         posters = scraping_movies.get_movie_posters(movie)
         themoviedb = scraping_movies.get_rich_data(movie, movie["type"])
         combined_movie_item = {**movie, **posters, **themoviedb}
-        movies_data.append(combined_movie_item)
+        mongodb.insert_movies(client, combined_movie_item)
 
-    mongodb.insert_movies(client, movies_data)
     mongodb.close_conn_to_db(client)
