@@ -1,4 +1,4 @@
-from astronomer.include.processing.utils.utils import select_last_model
+from processing.utils.utils import select_last_model
 
 
 class HybridFilteringModel() :

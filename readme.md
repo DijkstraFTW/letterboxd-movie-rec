@@ -73,9 +73,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Feedback
 
 We welcome feedback and contributions. Feel free to open an issue or submit a pull request.
-
-
-useful commands
-
-astro deployment variable update --deployment-id clri736yr067o01pbcz4yd49b --load .env
-astro deploy clri736yr067o01pbcz4yd49b -f

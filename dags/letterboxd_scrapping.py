@@ -1,12 +1,11 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
-from dotenv import load_dotenv
 
-from include.database.MongoDBClient import *
-from include.processing.scraping.ScrapingMovies import *
-from include.processing.scraping.ScrapingUserReviews import *
+from database.MongoDBClient import *
+from processing.scraping.ScrapingMovies import *
+from processing.scraping.ScrapingUserReviews import *
 
 load_dotenv()
 

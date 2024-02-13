@@ -1,7 +1,7 @@
 import pandas as pd
 
 from astronomer.include.database.MongoDBClient import MongoDBClient
-from astronomer.include.processing.utils.utils import remove_stopwords, create_bag_of_words
+from processing.utils.utils import remove_stopwords, create_bag_of_words
 
 
 class DataLoader:
