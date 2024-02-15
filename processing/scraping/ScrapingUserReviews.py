@@ -8,6 +8,7 @@ class ScrapingUserReviews:
 
     def __init__(self):
         self.popular_users_url = "https://letterboxd.com/members/popular/this/week/page/{}/"
+        self.user_page_url = "https://letterboxd.com/{}/"
         self.users_page_number_url = "https://letterboxd.com/{}/films/by/date"
         self.users_pages_url = "https://letterboxd.com/{}/films/by/date/page/{}/"
         self.num_top_users_pages = 100
@@ -34,6 +35,19 @@ class ScrapingUserReviews:
                 users.append(user)
 
         return users
+
+    def get_user(self, username):
+
+        r = requests.get(self.user_page_url.format(username))
+        page = BeautifulSoup(r.text, "html.parser")
+
+        user_id = str(uuid.uuid4())
+        display_name = page.find("span", attrs={"class": "displayname tooltip"}).text.strip()
+        num_reviews = page.find("h4", attrs={"class": "profile-statistic statistic"}).find("span", attrs={"class": "value"}).text
+        user = {"user_id": user_id, "username": username, "display_name": display_name,
+                "num_reviews": num_reviews}
+
+        return user
 
     def get_reviews_page_count(self, username):
 

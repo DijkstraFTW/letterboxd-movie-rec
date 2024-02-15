@@ -57,7 +57,17 @@ class MongoDBClient:
             collection.insert_one(movie)
             print("Successfully added movie data to MongoDB instance!")
         except Exception as e:
-            print("Error adding movies to MongoDB : " + str(e))
+            print("Error adding {} : {} movie to MongoDB : " + str(e).format(movie["movie_title"], movie["release_date"]))
+
+    def read_all_movies(self, client):
+        try:
+            collection = client[str(self.database)].movies
+            result = collection.find()
+            result = [item["movie_title_formatted"] for item in result]
+            return list(set(result))
+        except Exception as e:
+            print("Error reading all movies from MongoDB: " + str(e))
+            return []
 
     def read_all_rated_movies(self, client):
         try:
@@ -77,6 +87,16 @@ class MongoDBClient:
             print("Successfully added {} users to MongoDB instance!".format(len(users)))
         except Exception as e:
             print("Error adding users to MongoDB : " + str(e))
+
+    def find_user(self, client, username):
+        query = {"username": username}
+        try:
+            collection = client[str(self.database)].users
+            result = collection.find(query).count()
+            return result
+        except Exception as e:
+            print("Error reading all users from MongoDB: " + str(e))
+            return []
 
     def insert_embeddings(self, client, embeddings, df_merged):
         try:
