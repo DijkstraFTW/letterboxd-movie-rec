@@ -9,8 +9,8 @@ class ScrapingUserReviews:
     def __init__(self):
         self.popular_users_url = "https://letterboxd.com/members/popular/this/week/page/{}/"
         self.user_page_url = "https://letterboxd.com/{}/"
-        self.users_page_number_url = "https://letterboxd.com/{}/films/by/date"
-        self.users_pages_url = "https://letterboxd.com/{}/films/by/date/page/{}/"
+        self.users_page_number_url = "https://letterboxd.com/{}/films/diary/"
+        self.users_pages_url = "https://letterboxd.com/{}/films/diary/page/{}/"
         self.num_top_users_pages = 100
         self.num_user_ratings_pages = 10
 
@@ -51,6 +51,8 @@ class ScrapingUserReviews:
 
     def get_reviews_page_count(self, username):
 
+        # TODO adapt to diary page
+
         response = requests.get(self.users_page_number_url.format(username))
         soup = BeautifulSoup(response.text, features="html.parser")
         body = soup.find("body")
@@ -67,28 +69,50 @@ class ScrapingUserReviews:
             num_pages = 1
             display_name = None
 
-        return num_pages, display_name
+        return num_pages, display_name 
 
-    def get_rating_data(self, response, user_id, return_unrated=False):
+    def get_ratings_data(self, response, user_id, return_unrated=False):
 
         ratings = []
 
-        reviews = response.findAll("li", attrs={"class": "poster-container"})
+        reviews = response.findAll("tr", attrs={"class": "diary-entry-row viewing-poster-container"})
 
         for review in reviews:
+
+            date_element = review.find('td', class_='td-day diary-day center').find("a")["href"].split("/")
+            date = date_element[-4] + "-" + date_element[-3] + "-" + date_element[-2]
+
             movie_title = review.find("div", attrs={"class", "film-poster"})["data-film-slug"]
 
-            rating = review.find("span", attrs={"class": "rating"})
-            if not rating:
-                if not return_unrated:
-                    continue
-                else:
-                    rating_val = -1
-            else:
-                rating_class = rating["class"][-1]
-                rating_val = int(rating_class.split("-")[-1])
+            try:
+                rating_val = review.find('td', class_='td-rating rating-green').find('span')['class'][-1].split("rated-")[-1]
+            except:
+                rating_val = 0
 
-            rating_object = {"movie_title": movie_title, "rating_val": rating_val, "user_id": user_id}
+            # TODO : https://letterboxd.com/kurstboy/films/by/date/
+            try :
+                liked_element = review.find('td', class_='td-like center diary-like')
+                is_liked = liked_element.has_attr('class') and 'icon-like' in liked_element['class']
+                print(liked_element)
+
+            except :
+                is_liked = False
+
+            try :
+                rewatch_element = review.find('td', class_='td-rewatch center').find("span")
+                is_rewatch = rewatch_element.has_attr('class') and 'icon-rewatch' in rewatch_element['class']
+
+            except:
+                is_rewatch = False
+
+            try :
+                review_element = review.find('td', class_='td-review center').find("span")
+                is_reviewed = review_element.has_attr('class') and 'icon-review' in review_element['class']
+
+            except:
+                is_reviewed = False
+
+            rating_object = {"movie_title": movie_title, "rating_date": date, "rating_val": rating_val, "user_id": user_id, "is_rewatch" : is_rewatch, "is_liked" : is_liked, "is_review" : is_reviewed}
             ratings.append(rating_object)
 
         return ratings
@@ -100,7 +124,7 @@ class ScrapingUserReviews:
         for i in range(self.num_user_ratings_pages):
             page = requests.get(self.users_pages_url.format(username, i + 1), {"username": username})
             response = BeautifulSoup(page.text, features="html.parser")
-            rating = self.get_rating_data(response, user_id, return_unrated=return_unrated)
+            rating = self.get_ratings_data(response, user_id, return_unrated=return_unrated)
             ratings.append(rating)
 
         return ratings

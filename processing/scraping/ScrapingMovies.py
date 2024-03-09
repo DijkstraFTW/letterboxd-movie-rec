@@ -13,6 +13,8 @@ class ScrapingMovies:
         self.themoviedb_url = "https://api.themoviedb.org/3/{}/{}"
         self.themoviedb_key = os.getenv("THEMOVIEDB_KEY")
         self.empty_image_url_prefix = "https://s.ltrbxd.com/static/img/empty-poster"
+        self.movies_themes_url = "https://letterboxd.com/film/{}/themes/"
+        self.movies_nanogenres_url = "https://letterboxd.com/film/{}/nanogenres/"
         self.movies_list = movies_list
 
     def get_letterboxd_movies(self, url, movie_title_format):
@@ -60,9 +62,9 @@ class ScrapingMovies:
 
         return movie_object
 
-    def get_movie_poster(self, url):
+    def get_movie_poster(self, movie_title_format):
 
-        response = requests.get(url)
+        response = requests.get(self.posters_url.format(movie_title_format))
         soup = BeautifulSoup(response.text, features="html.parser")
 
         try:
@@ -73,6 +75,44 @@ class ScrapingMovies:
             image_url = ''
 
         return dict({"poster_url": image_url})
+
+    def get_movie_themes(self, movie_title_format):
+
+        response = requests.get(self.movies_themes_url.format(movie_title_format))
+        soup = BeautifulSoup(response.text, features="html.parser")
+        sections = soup.find_all('section', attrs={'class': 'section genre-group'})
+        themes = []
+
+        try:
+
+            for i in range(len(sections)):
+                theme = sections[i].find('h2').find('a').find('span', attrs={'class': 'label'}).text
+                print(theme)
+                themes.append(theme)
+
+        except:
+            themes = []
+
+        return dict({"themes": themes})
+
+    def get_movie_nanogenres(self, movie_title_format):
+
+        response = requests.get(self.movies_nanogenres_url.format(movie_title_format))
+        soup = BeautifulSoup(response.text, features="html.parser")
+        sections = soup.find_all('section', attrs={'class': 'section genre-group'})
+        nanogenres = []
+
+        try:
+
+            for i in range(len(sections)):
+                nanogenre = sections[i].find('h2').find('a').find('span', attrs={'class': 'label'}).text
+                print(nanogenre)
+                nanogenres.append(nanogenre)
+
+        except:
+            nanogenres = []
+
+        return dict({"nanogenres": nanogenres})
 
     def fetch_themoviedb_data(self, url):
 
@@ -108,7 +148,13 @@ class ScrapingMovies:
         return result
 
     def get_movie_posters(self, movie):
-        return dict(self.get_movie_poster(self.posters_url.format(movie["movie_title_formatted"])))
+        return dict(self.get_movie_poster(movie["movie_title_formatted"]))
+
+    def get_movie_themes(self, movie):
+        return dict(self.get_movie_themes(movie["movie_title_formatted"]))
+
+    def get_movie_nanogenres(self, movie):
+        return dict(self.get_movie_nanogenres(movie["movie_title_formatted"]))
 
     def get_rich_data(self, movie, type):
         if type != "none":

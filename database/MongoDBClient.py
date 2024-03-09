@@ -2,7 +2,6 @@ import os
 
 import certifi
 import numpy as np
-from dotenv import load_dotenv
 from pymongo import MongoClient
 
 class MongoDBClient:

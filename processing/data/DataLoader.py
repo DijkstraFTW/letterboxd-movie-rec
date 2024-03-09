@@ -1,6 +1,6 @@
 import pandas as pd
 
-from astronomer.include.database.MongoDBClient import MongoDBClient
+from database.MongoDBClient import MongoDBClient
 from processing.utils.utils import remove_stopwords, create_bag_of_words
 
 
@@ -55,8 +55,7 @@ class DataLoader:
 
         df_movies = pd.DataFrame(movies_list)
         df_movies["movie_title_formatted"] = str(df_movies["movie_title_formatted"])
-
-        # TODO add filtering func for NaN
+        df_movies = df_movies.dropna()
 
         print(f"{len(df_movies)} movies succesfully loaded !")
 
@@ -71,7 +70,6 @@ class DataLoader:
         """
 
         # Merging the two dataframes
-        df_merged = pd.DataFrame({})
         df_unique_ratings = df_ratings[['movie_title', 'movie_id_int']].drop_duplicates(subset='movie_id_int',
                                                                                         keep="first")
         df_merged = pd.merge(df_movies, df_unique_ratings, left_on='movie_title_formatted', right_on='movie_title',

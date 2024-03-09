@@ -69,8 +69,10 @@ def scraping_user_movies_shows():
 
     for movie in letterboxd_movies:
         posters = scraping_movies.get_movie_posters(movie)
+        themes = scraping_movies.get_movie_themes(movie)
+        nanogenres = scraping_movies.get_movie_nanogenres(movie)
         themoviedb = scraping_movies.get_rich_data(movie, movie["type"])
-        combined_movie_item = {**movie, **posters, **themoviedb}
+        combined_movie_item = {**movie, **posters, **themes, **nanogenres, **themoviedb}
         if combined_movie_item["type"] != "none":
             mongodb.insert_movies(client, combined_movie_item)
 
