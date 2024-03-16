@@ -15,6 +15,7 @@ class ScrapingMovies:
         self.empty_image_url_prefix = "https://s.ltrbxd.com/static/img/empty-poster"
         self.movies_themes_url = "https://letterboxd.com/film/{}/themes/"
         self.movies_nanogenres_url = "https://letterboxd.com/film/{}/nanogenres/"
+        self.movie_reviews_url = "https://letterboxd.com/film/{}/reviews/by/added-earliest/page/{}/"
         self.movies_list = movies_list
 
     def get_letterboxd_movies(self, url, movie_title_format):
@@ -161,3 +162,52 @@ class ScrapingMovies:
             return dict(
                 self.fetch_themoviedb_data(self.themoviedb_url.format(type, movie["tmdb_id"], self.themoviedb_key)))
         return {}
+
+    def get_movie_reviews(self, movie_title_format, num_pages):
+
+        reviews = []
+
+        for page_number in range(num_pages):
+            response = requests.get(self.movie_reviews_url.format(movie_title_format, page_number + 1))
+            soup = BeautifulSoup(response.text, features="html.parser")
+
+            reviews_list = soup.find_all('div', attrs={'class': 'film-detail-content'})
+
+            for review in reviews_list:
+
+                # TODO : add reviews number of likes
+
+                try:
+                    review_date = review.find('span', attrs={'class': '_nobr'}).text
+                except:
+                    review_date = ""
+
+                try:
+                    review_content = review.find('div', attrs={'class': 'body-text -prose collapsible-text'}).find(
+                        "p").text
+                except:
+                    review_content = ""
+
+                try:
+                    review_author = review.find('strong', attrs={'class': 'name'}).text
+                except:
+                    review_author = ""
+
+                try:
+                    review_note = review.find('p', attrs={'class': 'attribution'}).find('span')["class"][-1].split("rated-")[-1]
+                except:
+                    review_note = ""
+
+                try:
+                    review_comments = review.find('p', attrs={'class': 'attribution'}).find('a', attrs={
+                        'class': 'has-icon icon-comment icon-16 comment-count'}).text
+                except:
+                    review_comments = ""
+
+                reviews.append({"review_date": review_date, "review_content": review_content, "review_author": review_author,
+                                "review_note": review_note, "review_comments": review_comments})
+
+        return reviews
+
+
+

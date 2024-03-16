@@ -9,10 +9,12 @@ class ScrapingUserReviews:
     def __init__(self):
         self.popular_users_url = "https://letterboxd.com/members/popular/this/week/page/{}/"
         self.user_page_url = "https://letterboxd.com/{}/"
-        self.users_page_number_url = "https://letterboxd.com/{}/films/diary/"
-        self.users_pages_url = "https://letterboxd.com/{}/films/diary/page/{}/"
+        self.users_diary_page_number_url = "https://letterboxd.com/mistat/films/diary/by/added/"
+        self.users_diary_pages_url = "https://letterboxd.com/mistat/films/diary/by/added/page/{}/"
+        self.users_grid_page_number_url = "https://letterboxd.com/{}/films/by/date/"
+        self.users_grid_pages_url = "https://letterboxd.com/{}/films/by/date/page/{}/"
         self.num_top_users_pages = 100
-        self.num_user_ratings_pages = 10
+        self.num_user_ratings_pages = 3
 
     def get_popular_users(self):
         users = []
@@ -49,11 +51,9 @@ class ScrapingUserReviews:
 
         return user
 
-    def get_reviews_page_count(self, username):
+    def get_diary_reviews_page_count(self, username):
 
-        # TODO adapt to diary page
-
-        response = requests.get(self.users_page_number_url.format(username))
+        response = requests.get(self.users_diary_page_number_url.format(username))
         soup = BeautifulSoup(response.text, features="html.parser")
         body = soup.find("body")
 
@@ -63,24 +63,37 @@ class ScrapingUserReviews:
         try:
             page_link = soup.findAll("li", attrs={"class", "paginate-page"})[-1]
             num_pages = int(page_link.find("a").text.replace(",", ""))
-            display_name = (body.find("section", attrs={"class": "profile-header"}).find("h1", attrs={
-                "class": "title-3"}).text.strip())
         except IndexError:
-            num_pages = 1
-            display_name = None
+            num_pages = self.num_user_ratings_pages
 
-        return num_pages, display_name 
+        return num_pages
+
+    def get_grid_reviews_page_count(self, username):
+
+        response = requests.get(self.users_grid_pages_url.format(username))
+        soup = BeautifulSoup(response.text, features="html.parser")
+        body = soup.find("body")
+
+        if "error" in body["class"]:
+            return -1, None
+
+        try:
+            page_link = soup.findAll("li", attrs={"class", "paginate-page"})[-1]
+            num_pages = int(page_link.find("a").text.replace(",", ""))
+        except IndexError:
+            num_pages = self.num_user_ratings_pages
+
+        return num_pages
 
     def get_ratings_data(self, response, user_id, return_unrated=False):
 
         ratings = []
-
-        reviews = response.findAll("tr", attrs={"class": "diary-entry-row viewing-poster-container"})
+        reviews = response.select('tr[class*="diary-entry-row viewing-poster-container"]')
 
         for review in reviews:
 
             date_element = review.find('td', class_='td-day diary-day center').find("a")["href"].split("/")
-            date = date_element[-4] + "-" + date_element[-3] + "-" + date_element[-2]
+            date = date_element[-4] + "-" + date_element[-5] + "-" + date_element[-6]
 
             movie_title = review.find("div", attrs={"class", "film-poster"})["data-film-slug"]
 
@@ -89,15 +102,6 @@ class ScrapingUserReviews:
             except:
                 rating_val = 0
 
-            # TODO : https://letterboxd.com/kurstboy/films/by/date/
-            try :
-                liked_element = review.find('td', class_='td-like center diary-like')
-                is_liked = liked_element.has_attr('class') and 'icon-like' in liked_element['class']
-                print(liked_element)
-
-            except :
-                is_liked = False
-
             try :
                 rewatch_element = review.find('td', class_='td-rewatch center').find("span")
                 is_rewatch = rewatch_element.has_attr('class') and 'icon-rewatch' in rewatch_element['class']
@@ -105,34 +109,67 @@ class ScrapingUserReviews:
             except:
                 is_rewatch = False
 
-            try :
-                review_element = review.find('td', class_='td-review center').find("span")
-                is_reviewed = review_element.has_attr('class') and 'icon-review' in review_element['class']
+            try:
+                review_element = review.find('td', class_='td-review center').find("a")
+                is_reviewed = True
 
             except:
                 is_reviewed = False
 
-            rating_object = {"movie_title": movie_title, "rating_date": date, "rating_val": rating_val, "user_id": user_id, "is_rewatch" : is_rewatch, "is_liked" : is_liked, "is_review" : is_reviewed}
+            rating_object = {"movie_title": movie_title, "rating_date": date, "rating_val": rating_val, "user_id": user_id, "is_rewatch" : is_rewatch, "is_review" : is_reviewed}
             ratings.append(rating_object)
 
         return ratings
 
+    def get_ratings_data_likes(self, username):
+
+        likes = []
+
+        for i in range(self.num_user_ratings_pages):
+
+            page = requests.get(self.users_grid_pages_url.format(username, i + 1), {"username": username})
+            response = BeautifulSoup(page.text, features="html.parser")
+
+            reviews = response.findAll("li", attrs={"class": "poster-container"})
+            for review in reviews:
+                try:
+                    like_element = review.find('p', class_='poster-viewingdata').find("span", class_='like liked-micro has-icon icon-liked icon-16').find('span')
+                    is_liked = True
+
+                except:
+                    is_liked = False
+
+                likes.append({"is_liked": is_liked})
+
+        return likes
+
     def get_user_ratings(self, username, user_id, store_in_db=True, return_unrated=False):
 
         ratings = []
+        all_likes = []
+        combined_rating = []
+        nb_diary_pages = self.get_diary_reviews_page_count(username)
+        nb_grid_pages = self.get_grid_reviews_page_count(username)
 
-        for i in range(self.num_user_ratings_pages):
-            page = requests.get(self.users_pages_url.format(username, i + 1), {"username": username})
+        for i in range(nb_diary_pages):
+            page = requests.get(self.users_diary_pages_url.format(username, i + 1), {"username": username})
             response = BeautifulSoup(page.text, features="html.parser")
             rating = self.get_ratings_data(response, user_id, return_unrated=return_unrated)
-            ratings.append(rating)
+            ratings.extend(rating)
 
-        return ratings
+        for i in range(nb_grid_pages):
+            likes = self.get_ratings_data_likes(username)
+            all_likes.extend(likes)
+
+        for i in range(min(len(ratings), len(all_likes))):
+            combined_rating.append({**ratings[i], **all_likes[i]})
+
+        return combined_rating
 
     def get_all_ratings(self, username, data_opt_out=False):
 
         store_in_db = True
-        num_pages, display_name = self.get_reviews_page_count(username)
+        num_pages = self.get_diary_reviews_page_count(username)
 
         if num_pages == -1:
             return [], "user_not_found"
