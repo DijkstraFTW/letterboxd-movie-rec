@@ -70,7 +70,7 @@ class ScrapingUserReviews:
 
     def get_grid_reviews_page_count(self, username):
 
-        response = requests.get(self.users_grid_pages_url.format(username))
+        response = requests.get(self.users_grid_page_number_url.format(username))
         soup = BeautifulSoup(response.text, features="html.parser")
         body = soup.find("body")
 

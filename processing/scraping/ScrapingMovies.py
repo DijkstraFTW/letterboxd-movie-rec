@@ -151,10 +151,10 @@ class ScrapingMovies:
     def get_movie_posters(self, movie):
         return dict(self.get_movie_poster(movie["movie_title_formatted"]))
 
-    def get_movie_themes(self, movie):
+    def get_movies_themes(self, movie):
         return dict(self.get_movie_themes(movie["movie_title_formatted"]))
 
-    def get_movie_nanogenres(self, movie):
+    def get_movies_nanogenres(self, movie):
         return dict(self.get_movie_nanogenres(movie["movie_title_formatted"]))
 
     def get_rich_data(self, movie, type):
