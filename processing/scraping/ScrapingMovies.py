@@ -1,8 +1,13 @@
 import datetime
 import os
+import re
 
 import requests
 from bs4 import BeautifulSoup
+
+
+def val2stars(index):
+    return f"{index * 2}"
 
 
 class ScrapingMovies:
@@ -16,6 +21,7 @@ class ScrapingMovies:
         self.movies_themes_url = "https://letterboxd.com/film/{}/themes/"
         self.movies_nanogenres_url = "https://letterboxd.com/film/{}/nanogenres/"
         self.movie_reviews_url = "https://letterboxd.com/film/{}/reviews/by/added-earliest/page/{}/"
+        self.rating_histograms_url = "https://letterboxd.com/csi/film/{}/rating-histogram/"
         self.movies_list = movies_list
 
     def get_letterboxd_movies(self, url, movie_title_format):
@@ -46,20 +52,62 @@ class ScrapingMovies:
         try:
             themoviedb_link = soup.find("a", attrs={"data-track-action": "TMDb"})['href']
             themoviedb_id = themoviedb_link.split('/movie')[1].strip('/').split('/')[0]
-            type = "movie"
+            type_ = "movie"
         except:
             try:
                 themoviedb_link = soup.find("a", attrs={"data-track-action": "TMDb"})['href']
                 themoviedb_id = themoviedb_link.split('/tv')[1].strip('/').split('/')[0]
-                type = "tv"
+                type_ = "tv"
             except:
                 themoviedb_link = ""
                 themoviedb_id = ""
-                type = "none"
+                type_ = "none"
 
-        movie_object = {"movie_title_formatted": movie_title_format, "movie_title": movie_title, "type": type,
+        response = requests.get("https://letterboxd.com/csi/film/{}/rating-histogram/".format(movie_title_format))
+        hist_soup = BeautifulSoup(response.text, features="html.parser")
+        ratings = hist_soup.find_all("li", {'class': 'rating-histogram-bar'})
+
+        tot_ratings = 0
+        film_hist = {}
+
+        try:
+            fans = hist_soup.find('a', {'class': 'all-link more-link'}).text
+            fans = re.findall(r'\d+.\d+K?|\d+K?', fans)[0]
+            if "." and "K" in fans:
+                fans = int(float(fans[:-1]) * 1000)
+            elif "K" in fans:
+                fans = int(fans[-1]) * 1000
+            else:
+                fans = int(fans)
+        except:
+            fans = 0
+
+        try:
+            lb_rating = hist_soup.find('span', {'class': 'average-rating'}).find('a').text
+        except:
+            lb_rating = 0
+
+        try:
+            for i, r in enumerate(ratings):
+                string = r.text.strip(" ")
+                stars = val2stars((i + 1) / 2)
+                if string == "":
+                    film_hist[f"{stars}"] = 0
+                else:
+                    Nratings = re.findall(r'\d+', string)[:-1]
+                    Nratings = int(''.join(Nratings))
+                    film_hist[f"{stars}"] = Nratings
+                    tot_ratings += Nratings
+        except:
+            tot_ratings = ""
+
+        film_hist["fans"] = fans
+        film_hist["lb_rating"] = lb_rating
+        film_hist["total"] = tot_ratings
+
+        movie_object = {"movie_title_formatted": movie_title_format, "movie_title": movie_title, "type": type_,
                         "year_released": year, "imdb_link": imdb_link, "tmdb_link": themoviedb_link, "imdb_id": imdb_id,
-                        "tmdb_id": themoviedb_id}
+                        "tmdb_id": themoviedb_id, "lb_rating": lb_rating, "histogram": film_hist}
 
         return movie_object
 
@@ -85,12 +133,10 @@ class ScrapingMovies:
         themes = []
 
         try:
-
             for i in range(len(sections)):
                 theme = sections[i].find('h2').find('a').find('span', attrs={'class': 'label'}).text
                 print(theme)
                 themes.append(theme)
-
         except:
             themes = []
 
@@ -104,12 +150,10 @@ class ScrapingMovies:
         nanogenres = []
 
         try:
-
             for i in range(len(sections)):
                 nanogenre = sections[i].find('h2').find('a').find('span', attrs={'class': 'label'}).text
                 print(nanogenre)
                 nanogenres.append(nanogenre)
-
         except:
             nanogenres = []
 
@@ -194,7 +238,8 @@ class ScrapingMovies:
                     review_author = ""
 
                 try:
-                    review_note = review.find('p', attrs={'class': 'attribution'}).find('span')["class"][-1].split("rated-")[-1]
+                    review_note = \
+                        review.find('p', attrs={'class': 'attribution'}).find('span')["class"][-1].split("rated-")[-1]
                 except:
                     review_note = ""
 
@@ -204,10 +249,8 @@ class ScrapingMovies:
                 except:
                     review_comments = ""
 
-                reviews.append({"review_date": review_date, "review_content": review_content, "review_author": review_author,
-                                "review_note": review_note, "review_comments": review_comments})
+                reviews.append(
+                    {"review_date": review_date, "review_content": review_content, "review_author": review_author,
+                     "review_note": review_note, "review_comments": review_comments})
 
         return reviews
-
-
-

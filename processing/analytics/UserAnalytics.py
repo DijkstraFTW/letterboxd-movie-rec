@@ -22,8 +22,6 @@ class UserAnalytics:
 
     def get_basic_metrics(self):
 
-        # TODO : group in one object
-
         movies_reviewed = self.conn.execute("SELECT COUNT(*) FROM movies WHERE type = 'movie'").fetchone()[0]
         shows_reviewed = self.conn.execute("SELECT COUNT(*) FROM movies WHERE type = 'shows'").fetchone()[0]
         hours_watched = self.conn.execute("SELECT SUM(runtime) FROM movies").fetchone()[0]
@@ -56,7 +54,7 @@ class UserAnalytics:
             GROUP BY rating_date
             HAVING COUNT(*) > {mean_daily_reviews}
         ) AS days_with_more_than_median_reviews
-        """).fetchdf()
+        """).fetchone()[0]
 
         logged_per_release_year = self.conn.execute("""SELECT year_released, COUNT(*) AS num_movies
         FROM movies
@@ -78,10 +76,161 @@ class UserAnalytics:
         GROUP BY m.year_released
         ORDER BY m.year_released
         """).fetchdf()
+
+        longest_streak = self.conn.execute("""
+        WITH DateDiffs AS (
+            SELECT
+                user_id,
+                rating_date,
+                LAG(rating_date) OVER (PARTITION BY user_id ORDER BY rating_date) AS prev_date
+            FROM
+                reviews
+        ),
+        Streaks AS (
+            SELECT
+                user_id,
+                rating_date,
+                CASE 
+                    WHEN prev_date IS NULL OR DATEDIFF(
+                        'days', 
+                        CAST(SUBSTR(prev_date, 7, 4) || '-' || SUBSTR(prev_date, 4, 2) || '-' || SUBSTR(prev_date, 1, 2) AS DATE), 
+                        CAST(SUBSTR(rating_date, 7, 4) || '-' || SUBSTR(rating_date, 4, 2) || '-' || SUBSTR(rating_date, 1, 2) AS DATE)
+                    ) > 1 THEN 1
+                    ELSE 0
+                END AS new_streak
+            FROM
+                DateDiffs
+        ),
+        StreakGroups AS (
+            SELECT
+                user_id,
+                rating_date,
+                SUM(new_streak) OVER (PARTITION BY user_id ORDER BY rating_date) AS streak_group
+            FROM
+                Streaks
+        ),
+        StreakLengths AS (
+            SELECT
+                user_id,
+                streak_group,
+                COUNT(*) AS streak_length
+            FROM
+                StreakGroups
+            GROUP BY
+                user_id, streak_group
+        ),
+        MaxStreak AS (
+            SELECT
+                MAX(streak_length) AS longest_streak
+            FROM
+                StreakLengths
+        )
+        
+        SELECT longest_streak FROM MaxStreak;
         
         
-        # TODO
-        longest_streak = ""
+        """).fetchone()[0]
+
+        average_rating_decade = self.conn.execute("""
+        SELECT
+            FLOOR(year_released / 10) * 10 AS decade,
+            AVG(CAST(rating_val AS INTEGER)) AS average_rating
+        FROM
+            reviews
+        JOIN
+            movies ON reviews.movie_title = movies.movie_title_formatted
+        GROUP BY
+            FLOOR(year_released / 10) * 10
+        ORDER BY
+            decade;
+        """).fetchdf()
+
+        top_10_movies_decade = self.conn.execute("""
+        WITH DecadeMovies AS (
+            SELECT
+                movies.movie_title,
+                movies.year_released,
+                FLOOR(movies.year_released / 10) * 10 AS decade,
+                AVG(CAST(reviews.rating_val AS INTEGER)) AS average_rating
+            FROM
+                reviews
+            JOIN
+                movies ON reviews.movie_title = movies.movie_title_formatted
+            GROUP BY
+                movies.movie_title, movies.year_released
+        ),
+        RankedMovies AS (
+            SELECT
+                movie_title,
+                year_released,
+                decade,
+                average_rating,
+                RANK() OVER (PARTITION BY decade ORDER BY average_rating DESC) AS rating_rank
+            FROM
+                DecadeMovies
+        )
+        
+        SELECT
+            decade,
+            movie_title,
+            year_released,
+            average_rating
+        FROM
+            RankedMovies
+        WHERE
+            rating_rank <= 10
+        ORDER BY
+            decade, average_rating DESC;
+        
+        """).fetchdf()
+
+        top_10_most_watched = self.conn.execute("""
+        SELECT
+            movie_title,
+            COUNT(*) AS watch_count
+        FROM
+            reviews
+        GROUP BY
+            movie_title
+        ORDER BY
+            watch_count DESC
+        LIMIT 10;
+        """).fetchdf()
+
+        top_10_greater_than_average_rating = self.conn.execute("""
+        SELECT DISTINCT
+            r.movie_title,
+            r.rating_val,
+            m.vote_average,
+            (CAST(r.rating_val AS FLOAT) - m.vote_average) AS margin
+        FROM
+            reviews r
+        JOIN
+            movies m ON r.movie_title = m.movie_title_formatted
+        WHERE
+            CAST(r.rating_val AS FLOAT) > m.vote_average
+        ORDER BY
+            margin DESC
+        LIMIT 10;
+        """).fetchdf()
+
+        top_10_lower_than_average_rating = self.conn.execute("""
+        SELECT DISTINCT
+            r.movie_title,
+            r.rating_val,
+            m.vote_average,
+            (CAST(r.rating_val AS FLOAT) - m.vote_average) AS margin
+        FROM
+            reviews r
+        JOIN
+            movies m ON r.movie_title = m.movie_title_formatted
+        WHERE
+            CAST(r.rating_val AS FLOAT) < m.vote_average
+        ORDER BY
+            margin ASC
+        LIMIT 10;
+        """).fetchdf()
+        
 
 
     def close(self):
