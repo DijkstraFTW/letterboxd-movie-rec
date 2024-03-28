@@ -21,7 +21,6 @@ class UserAnalytics:
         self.conn.register('movies', self.user_movies)
 
     def get_basic_metrics(self):
-
         movies_reviewed = self.conn.execute("SELECT COUNT(*) FROM movies WHERE type = 'movie'").fetchone()[0]
         shows_reviewed = self.conn.execute("SELECT COUNT(*) FROM movies WHERE type = 'shows'").fetchone()[0]
         hours_watched = self.conn.execute("SELECT SUM(runtime) FROM movies").fetchone()[0]
@@ -230,7 +229,249 @@ class UserAnalytics:
             margin ASC
         LIMIT 10;
         """).fetchdf()
-        
+
+        top_10_production_country_by_watch_count = self.conn.execute("""
+        SELECT country, COUNT(*) AS count
+        FROM (
+            SELECT TRIM(unnested_country) AS country
+            FROM (
+                SELECT UNNEST(SPLIT(REPLACE(REPLACE(production_countries, '[', ''), ']', ''), ',')) AS unnested_country
+                FROM movies
+            ) AS t
+        ) AS countries
+        GROUP BY country
+        ORDER BY count DESC
+        LIMIT 10
+        """).fetchdf()
+
+        top_10_spoken_language_by_watch_count = self.conn.execute("""
+        SELECT lang, COUNT(*) AS count
+        FROM (
+            SELECT TRIM(unnested_lang) AS lang
+            FROM (
+                SELECT UNNEST(SPLIT(REPLACE(REPLACE(spoken_languages, '[', ''), ']', ''), ',')) AS unnested_lang
+                FROM movies
+            ) AS t
+        ) AS languages
+        GROUP BY lang
+        ORDER BY count DESC
+        LIMIT 10
+        """).fetchdf()
+
+        top_10_production_country_by_average_rating = self.conn.execute("""
+        SELECT
+            unnested_country,
+            AVG(CAST(r.rating_val AS FLOAT)) AS average_rating
+        FROM (
+            SELECT
+                TRIM(UNNEST(SPLIT(REPLACE(REPLACE(m.production_countries, '[', ''), ']', ''), ','))) AS unnested_country,
+                m.movie_title_formatted
+            FROM movies m
+        ) AS countries
+        JOIN reviews r ON countries.movie_title_formatted = r.movie_title
+        GROUP BY unnested_country
+        ORDER BY average_rating DESC
+        LIMIT 10
+        """).fetchdf()
+
+        top_10_spoken_countries_by_average_rating = self.conn.execute("""
+        SELECT
+            unnested_lang,
+            AVG(CAST(r.rating_val AS FLOAT)) AS average_rating
+        FROM (
+            SELECT
+                TRIM(UNNEST(SPLIT(REPLACE(REPLACE(m.spoken_languages, '[', ''), ']', ''), ','))) AS unnested_lang,
+                m.movie_title_formatted
+            FROM movies m
+        ) AS languages
+        JOIN reviews r ON languages.movie_title_formatted = r.movie_title
+        GROUP BY unnested_lang
+        ORDER BY average_rating DESC
+        LIMIT 10
+        """).fetchdf()
+
+        top_10_genres_by_watch_count = self.conn.execute("""
+        SELECT
+            unnested_genre,
+            COUNT(*) AS watch_count
+        FROM (
+            SELECT
+                UNNEST(SPLIT(REPLACE(REPLACE(genres, '[', ''), ']', ''), ',')) AS unnested_genre,
+                movies.movie_title_formatted
+            FROM movies
+        ) AS genre_expansion
+        JOIN reviews ON genre_expansion.movie_title_formatted = reviews.movie_title
+        GROUP BY
+            unnested_genre
+        ORDER BY
+            watch_count DESC
+        LIMIT 10;
+        """).fetchdf()
+
+        top_10_themes_by_watch_count = self.conn.execute("""
+        SELECT
+            unnested_themes,
+            COUNT(*) AS watch_count
+        FROM (
+            SELECT
+                UNNEST(SPLIT(REPLACE(REPLACE(themes, '[', ''), ']', ''), ',')) AS unnested_themes,
+                movies.movie_title_formatted
+            FROM movies
+        ) AS theme_expansion
+        JOIN reviews ON theme_expansion.movie_title_formatted = reviews.movie_title
+        GROUP BY
+            unnested_themes
+        ORDER BY
+            watch_count DESC
+        LIMIT 10;
+        """).fetchdf()
+
+        top_10_nanogenres_by_watch_count = self.conn.execute("""
+                SELECT
+            unnested_nanogenres,
+            COUNT(*) AS watch_count
+        FROM (
+            SELECT
+                UNNEST(SPLIT(REPLACE(REPLACE(nanogenres, '[', ''), ']', ''), ',')) AS unnested_nanogenres,
+                movies.movie_title_formatted
+            FROM movies
+        ) AS nanogenre_expansion
+        JOIN reviews ON nanogenre_expansion.movie_title_formatted = reviews.movie_title
+        GROUP BY
+            unnested_nanogenres
+        ORDER BY
+            watch_count DESC
+        LIMIT 10;
+        """).fetchdf()
+
+        top_10_genres_by_watch_count = self.conn.execute("""
+                SELECT
+                    unnested_genre,
+                    COUNT(*) AS watch_count
+                FROM (
+                    SELECT
+                        UNNEST(SPLIT(REPLACE(REPLACE(genres, '[', ''), ']', ''), ',')) AS unnested_genre,
+                        movies.movie_title_formatted
+                    FROM movies
+                ) AS genre_expansion
+                JOIN reviews ON genre_expansion.movie_title_formatted = reviews.movie_title
+                GROUP BY
+                    unnested_genre
+                ORDER BY
+                    watch_count DESC
+                LIMIT 10;
+                """).fetchdf()
+
+        top_10_themes_by_watch_count = self.conn.execute("""
+                SELECT
+                    unnested_themes,
+                    COUNT(*) AS watch_count
+                FROM (
+                    SELECT
+                        UNNEST(SPLIT(REPLACE(REPLACE(themes, '[', ''), ']', ''), ',')) AS unnested_themes,
+                        movies.movie_title_formatted
+                    FROM movies
+                ) AS themes_expansion
+                JOIN reviews ON themes_expansion.movie_title_formatted = reviews.movie_title
+                GROUP BY
+                    unnested_themes
+                ORDER BY
+                    watch_count DESC
+                LIMIT 10;
+                """).fetchdf()
+
+        top_10_genres_by_average_rating = self.conn.execute("""
+            WITH SplitGenres AS (
+                SELECT
+                    m.movie_title,
+                    UNNEST(SPLIT(REPLACE(REPLACE(genres, '[', ''), ']', ''), ',')) AS unnested_genre,
+                    r.rating_val
+                FROM movies m
+                JOIN reviews r ON m.movie_title_formatted = r.movie_title
+                ),
+                AvgRatings AS (
+                    SELECT
+                        unnested_genre AS genre,
+                        AVG(CAST(rating_val AS FLOAT)) AS avg_rating
+                    FROM SplitGenres
+                    GROUP BY nanogenre
+                )
+                SELECT
+                    genre,
+                    avg_rating
+                FROM AvgRatings
+                ORDER BY avg_rating DESC
+                LIMIT 10;
+                """).fetchdf()
+
+        top_10_nanogenres_by_average_rating = self.conn.execute("""
+                    WITH SplitNanogenres AS (
+                        SELECT
+                            m.movie_title,
+                            UNNEST(SPLIT(REPLACE(REPLACE(nanogenres, '[', ''), ']', ''), ',')) AS unnested_nanogenre,
+                            r.rating_val
+                        FROM movies m
+                        JOIN reviews r ON m.movie_title_formatted = r.movie_title
+                        ),
+                        AvgRatings AS (
+                            SELECT
+                                unnested_nanogenre AS nanogenre,
+                                AVG(CAST(rating_val AS FLOAT)) AS avg_rating
+                            FROM SplitNanogenres
+                            GROUP BY nanogenre
+                        )
+                        SELECT
+                            nanogenre,
+                            avg_rating
+                        FROM AvgRatings
+                        ORDER BY avg_rating DESC
+                        LIMIT 10;
+                        """).fetchdf()
+
+        top_10_themes_by_average_rating = self.conn.execute("""
+        WITH SplitThemes AS (
+            SELECT
+                m.movie_title,
+                UNNEST(SPLIT(REPLACE(REPLACE(themes, '[', ''), ']', ''), ',')) AS unnested_themes,
+                r.rating_val
+            FROM movies m
+            JOIN reviews r ON m.movie_title_formatted = r.movie_title
+        ),
+        AvgRatings AS (
+            SELECT
+                unnested_themes AS theme,
+                AVG(CAST(rating_val AS FLOAT)) AS avg_rating
+            FROM SplitThemes
+            GROUP BY theme
+        )
+        SELECT
+            theme,
+            avg_rating
+        FROM AvgRatings
+        ORDER BY avg_rating DESC
+        LIMIT 10;
+                        """).fetchdf()
+
+
+        return {"movies_reviewed": movies_reviewed, "shows_reviewed": shows_reviewed, "hours_watched": hours_watched,
+                "most_common_countries": most_common_countries, "mean_daily_reviews": mean_daily_reviews,
+                "number_daily_reviews_over_mean": number_daily_reviews_over_mean,
+                "logged_per_release_year": logged_per_release_year, "logged_per_year": logged_per_year,
+                "average_rating_per_year": average_rating_per_year, "longest_streak": longest_streak,
+                "average_rating_decade": average_rating_decade, "top_10_movies_decade": top_10_movies_decade,
+                "top_10_most_watched": top_10_most_watched,
+                "top_10_greater_than_average_rating": top_10_greater_than_average_rating,
+                "top_10_lower_than_average_rating": top_10_lower_than_average_rating,
+                "top_10_production_country_by_watch_count": top_10_production_country_by_watch_count,
+                "top_10_spoken_language_by_watch_count": top_10_spoken_language_by_watch_count,
+                "top_10_production_country_by_average_rating": top_10_production_country_by_average_rating,
+                "top_10_spoken_countries_by_average_rating": top_10_spoken_countries_by_average_rating,
+                "top_10_genres_by_watch_count": top_10_genres_by_watch_count,
+                "top_10_themes_by_watch_count": top_10_themes_by_watch_count,
+                "top_10_nanogenres_by_watch_count": top_10_nanogenres_by_watch_count,
+                "top_10_genres_by_average_rating": top_10_genres_by_average_rating,
+                "top_10_nanogenres_by_average_rating": top_10_nanogenres_by_average_rating,
+                "top_10_themes_by_average_rating": top_10_themes_by_average_rating}
 
 
     def close(self):

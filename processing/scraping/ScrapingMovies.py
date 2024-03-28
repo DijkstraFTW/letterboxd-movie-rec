@@ -5,9 +5,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
-
-def val2stars(index):
-    return f"{index * 2}"
+from processing.utils.utils import val2stars
 
 
 class ScrapingMovies:
