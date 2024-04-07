@@ -1,9 +1,10 @@
-from datetime import timedelta
-
-from airflow import DAG
-from airflow.operators.python_operator import PythonOperator
+from datetime import timedelta, datetime
+from airflow.models import Variable
+from airflow.decorators import dag, task
+from dotenv import load_dotenv
 
 from database.MongoDBClient import *
+from processing.analytics.UserAnalytics import UserAnalytics
 from processing.scraping.ScrapingMovies import *
 from processing.scraping.ScrapingUserReviews import *
 
@@ -12,79 +13,92 @@ load_dotenv()
 default_args = {'owner': 'airflow', 'start_date': datetime.datetime(2024, 1, 1), 'depends_on_past': False, 'retries': 1,
                 'retry_delay': timedelta(minutes=5)}
 
-dag = DAG(
-    'letterboxd_scrapping_dag',
-    default_args=default_args,
-    schedule_interval='0 3 1 * *'
-)
 
-# TODO decompose each dag extract - transf - loading
+@dag('letterboxd_scrapping_dag', default_args=default_args, schedule_interval='0 3 1 * *')
+def letterboxd_user_recommendation():
+    # Scraping the user's reviews
+    @task
+    def scraping_user_reviews():
 
-# Scraping the user's Reviews
+        # check if user exists already
+        mongodb = MongoDBClient()
+        client = mongodb.open_conn_to_db()
+        user_found = mongodb.find_user(client, username)
 
-# request args
-username = "cuqui"
-data_opt_out = False
-user_reviews = []
+        # user doesn't exist
+        if user_found <= 0:
+            scraping_user_reviews = ScrapingUserReviews()
+            user_id = str(uuid.uuid4())
+            user = scraping_user_reviews.get_user(username)
+            ratings = scraping_user_reviews.get_user_ratings(username, user_id, data_opt_out)
+
+            if not data_opt_out:
+                mongodb.insert_users(client, user)
+                mongodb.insert_ratings(client, ratings)
+
+            user_reviews = ratings
+
+        # user exists
+        else:
+            user_id = mongodb.get_user_custom_id(client, username)
+            user_reviews = mongodb.get_reviews_by_user_id(client, user_id)
+
+        mongodb.close_conn_to_db(client)
+        return user_reviews
+
+    # Scraping the user's movies and shows
+    @task
+    def scraping_user_movies_shows(user_reviews: list):
+
+        mongodb = MongoDBClient()
+        client = mongodb.open_conn_to_db()
+
+        movies_scraped_set = set(mongodb.read_all_movies(client))
+        user_movies = set([item["movie_title"] for item in user_reviews])
+        new_movies_list = list(movies_scraped_set.difference(user_movies))
+
+        scraping_movies = ScrapingMovies(new_movies_list)
+        new_movies = scraping_movies.get_rated_movies()
+
+        for movie in new_movies:
+            posters = scraping_movies.get_movie_posters(movie)
+            themes = scraping_movies.get_movie_themes(movie)
+            nanogenres = scraping_movies.get_movie_nanogenres(movie)
+            themoviedb = scraping_movies.get_themoviedb_data(movie, movie["type"])
+            combined_movie_item = {**movie, **posters, **themes, **nanogenres, **themoviedb}
+            if combined_movie_item["type"] != "none":
+                mongodb.insert_movies(client, combined_movie_item)
+
+        mongodb.close_conn_to_db(client)
+        return user_movies
+
+    # Getting user recommendations
+    @task
+    def get_user_recommendations(user_reviews: list, user_movies: list):
+        user_recommendations = []
+        ## TODO: get user recommendations
+        return user_recommendations
+
+    # Getting user analytics
+    @task
+    def get_user_analytics(user_reviews: list, user_movies: list):
+
+        user_analytics = UserAnalytics(username, user_reviews, user_movies)
+        user_analytics.set_user_history_movies()
+        user_analytics.set_user_history_reviews()
+        user_analytics_data = user_analytics.get_basic_metrics()
+        return user_analytics_data
+
+    username = Variable.get("username")
+    data_opt_out = Variable.get("data_opt_out", default_var=False, deserialize_json=True)
+
+    user_reviews = scraping_user_reviews(username, data_opt_out)
+    user_movies_shows = scraping_user_movies_shows(user_reviews)
+    user_recommendation = get_user_recommendations(user_reviews, user_movies_shows)
+    user_analytics = get_user_analytics(user_reviews, user_movies_shows)
+
+    user_movies_shows >> user_recommendation
+    user_movies_shows >> user_analytics
 
 
-def scraping_user_reviews():
-
-    # check if user exists already
-    mongodb = MongoDBClient()
-    client = mongodb.open_conn_to_db()
-    user_found = mongodb.find_user(client, username)
-
-    # user doesn't exist
-    if user_found <= 0:
-        scraping_user_reviews = ScrapingUserReviews()
-
-        user_id = str(uuid.uuid4())
-        user = scraping_user_reviews.get_user(username)
-        ratings = scraping_user_reviews.get_user_ratings(username, user_id, data_opt_out)
-
-        if not data_opt_out:
-            mongodb.insert_users(client, user)
-            mongodb.insert_ratings(client, ratings)
-
-        return user, ratings
-
-    mongodb.close_conn_to_db(client)
-    return None
-
-
-task_scraping_user_reviews = PythonOperator(task_id='scraping_user_reviews', python_callable=scraping_user_reviews,
-                                             dag=dag, )
-
-
-# Scraping Movies and Shows
-def scraping_user_movies_shows():
-
-    mongodb = MongoDBClient()
-    client = mongodb.open_conn_to_db()
-
-    movies_scraped_set = set(mongodb.read_all_movies(client))
-    movies_list_set = set([item["movie_title"] for item in user_reviews])
-
-    common_movies_list = list(movies_scraped_set.intersection(movies_list_set))
-
-    scraping_movies = ScrapingMovies(common_movies_list)
-    letterboxd_movies = scraping_movies.get_rated_movies()
-
-    for movie in letterboxd_movies:
-        posters = scraping_movies.get_movie_posters(movie)
-        themes = scraping_movies.get_movie_themes(movie)
-        nanogenres = scraping_movies.get_movie_nanogenres(movie)
-        themoviedb = scraping_movies.get_themoviedb_data(movie, movie["type"])
-        combined_movie_item = {**movie, **posters, **themes, **nanogenres, **themoviedb}
-        if combined_movie_item["type"] != "none":
-            mongodb.insert_movies(client, combined_movie_item)
-
-    mongodb.close_conn_to_db(client)
-
-
-task_scraping_user_movies_shows = PythonOperator(task_id='scraping_movies_shows', python_callable=scraping_user_movies_shows,
-                                            dag=dag)
-
-# Task dependencies
-task_scraping_user_reviews >> task_scraping_user_movies_shows
+letterboxd_scraping = letterboxd_user_recommendation()

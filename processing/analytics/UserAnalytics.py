@@ -44,7 +44,7 @@ class UserAnalytics:
                 ) AS t
             ) AS countries
             GROUP BY country
-            ORDER BY count DESC""").fetchdf()
+            ORDER BY count DESC""").fetchdf().to_dict(orient='records')
 
         mean_daily_reviews = self.conn.execute("""
         SELECT ROUND(AVG(num_reviews)) AS mean
@@ -69,14 +69,14 @@ class UserAnalytics:
         FROM movies
         GROUP BY year_released
         ORDER BY year_released
-        """).fetchdf()
+        """).fetchdf().to_dict(orient='records')
 
         logged_per_year = self.conn.execute("""
         SELECT SUBSTRING(rating_date, -4) AS year, COUNT(*) AS num_reviews
         FROM reviews
         GROUP BY year
         ORDER BY year
-        """).fetchdf()
+        """).fetchdf().to_dict(orient='records')
 
         average_rating_per_year = self.conn.execute("""
         SELECT m.year_released, AVG(CAST(r.rating_val AS DOUBLE)) AS average_rating
@@ -84,7 +84,7 @@ class UserAnalytics:
         JOIN reviews r ON m.movie_title_formatted = r.movie_title
         GROUP BY m.year_released
         ORDER BY m.year_released
-        """).fetchdf()
+        """).fetchdf().to_dict(orient='records')
 
         longest_streak = self.conn.execute("""
         WITH DateDiffs AS (
@@ -134,10 +134,10 @@ class UserAnalytics:
             FROM
                 StreakLengths
         )
-        
+
         SELECT longest_streak FROM MaxStreak;
-        
-        
+
+
         """).fetchone()[0]
 
         average_rating_decade = self.conn.execute("""
@@ -152,7 +152,7 @@ class UserAnalytics:
             FLOOR(year_released / 10) * 10
         ORDER BY
             decade;
-        """).fetchdf()
+        """).fetchdf().to_dict(orient='records')
 
         top_10_movies_decade = self.conn.execute("""
         WITH DecadeMovies AS (
@@ -178,7 +178,7 @@ class UserAnalytics:
             FROM
                 DecadeMovies
         )
-        
+
         SELECT
             decade,
             movie_title,
@@ -190,8 +190,8 @@ class UserAnalytics:
             rating_rank <= 10
         ORDER BY
             decade, average_rating DESC;
-        
-        """).fetchdf()
+
+        """).fetchdf().to_dict(orient='records')
 
         top_10_most_watched = self.conn.execute("""
         SELECT
@@ -204,7 +204,7 @@ class UserAnalytics:
         ORDER BY
             watch_count DESC
         LIMIT 10;
-        """).fetchdf()
+        """).fetchdf().to_dict(orient='records')
 
         top_10_greater_than_average_rating = self.conn.execute("""
         SELECT DISTINCT
@@ -221,7 +221,7 @@ class UserAnalytics:
         ORDER BY
             margin DESC
         LIMIT 10;
-        """).fetchdf()
+        """).fetchdf().to_dict(orient='records')
 
         top_10_lower_than_average_rating = self.conn.execute("""
         SELECT DISTINCT
@@ -238,7 +238,7 @@ class UserAnalytics:
         ORDER BY
             margin ASC
         LIMIT 10;
-        """).fetchdf()
+        """).fetchdf().to_dict(orient='records')
 
         top_10_production_country_by_watch_count = self.conn.execute("""
         SELECT country, COUNT(*) AS count
@@ -252,7 +252,7 @@ class UserAnalytics:
         GROUP BY country
         ORDER BY count DESC
         LIMIT 10
-        """).fetchdf()
+        """).fetchdf().to_dict(orient='records')
 
         top_10_spoken_language_by_watch_count = self.conn.execute("""
         SELECT lang, COUNT(*) AS count
@@ -266,7 +266,7 @@ class UserAnalytics:
         GROUP BY lang
         ORDER BY count DESC
         LIMIT 10
-        """).fetchdf()
+        """).fetchdf().to_dict(orient='records')
 
         top_10_production_country_by_average_rating = self.conn.execute("""
         SELECT
@@ -282,7 +282,7 @@ class UserAnalytics:
         GROUP BY unnested_country
         ORDER BY average_rating DESC
         LIMIT 10
-        """).fetchdf()
+        """).fetchdf().to_dict(orient='records')
 
         top_10_spoken_countries_by_average_rating = self.conn.execute("""
         SELECT
@@ -298,7 +298,7 @@ class UserAnalytics:
         GROUP BY unnested_lang
         ORDER BY average_rating DESC
         LIMIT 10
-        """).fetchdf()
+        """).fetchdf().to_dict(orient='records')
 
         top_10_genres_by_watch_count = self.conn.execute("""
         SELECT
@@ -316,7 +316,7 @@ class UserAnalytics:
         ORDER BY
             watch_count DESC
         LIMIT 10;
-        """).fetchdf()
+        """).fetchdf().to_dict(orient='records')
 
         top_10_themes_by_watch_count = self.conn.execute("""
         SELECT
@@ -334,7 +334,7 @@ class UserAnalytics:
         ORDER BY
             watch_count DESC
         LIMIT 10;
-        """).fetchdf()
+        """).fetchdf().to_dict(orient='records')
 
         top_10_nanogenres_by_watch_count = self.conn.execute("""
                 SELECT
@@ -352,7 +352,7 @@ class UserAnalytics:
         ORDER BY
             watch_count DESC
         LIMIT 10;
-        """).fetchdf()
+        """).fetchdf().to_dict(orient='records')
 
         top_10_genres_by_watch_count = self.conn.execute("""
                 SELECT
@@ -370,7 +370,7 @@ class UserAnalytics:
                 ORDER BY
                     watch_count DESC
                 LIMIT 10;
-                """).fetchdf()
+                """).fetchdf().to_dict(orient='records')
 
         top_10_themes_by_watch_count = self.conn.execute("""
                 SELECT
@@ -388,7 +388,7 @@ class UserAnalytics:
                 ORDER BY
                     watch_count DESC
                 LIMIT 10;
-                """).fetchdf()
+                """).fetchdf().to_dict(orient='records')
 
         top_10_genres_by_average_rating = self.conn.execute("""
             WITH SplitGenres AS (
@@ -404,7 +404,7 @@ class UserAnalytics:
                         unnested_genre AS genre,
                         AVG(CAST(rating_val AS FLOAT)) AS avg_rating
                     FROM SplitGenres
-                    GROUP BY nanogenre
+                    GROUP BY genre
                 )
                 SELECT
                     genre,
@@ -412,7 +412,7 @@ class UserAnalytics:
                 FROM AvgRatings
                 ORDER BY avg_rating DESC
                 LIMIT 10;
-                """).fetchdf()
+                """).fetchdf().to_dict(orient='records')
 
         top_10_nanogenres_by_average_rating = self.conn.execute("""
                     WITH SplitNanogenres AS (
@@ -436,7 +436,7 @@ class UserAnalytics:
                         FROM AvgRatings
                         ORDER BY avg_rating DESC
                         LIMIT 10;
-                        """).fetchdf()
+                        """).fetchdf().to_dict(orient='records')
 
         top_10_themes_by_average_rating = self.conn.execute("""
         WITH SplitThemes AS (
@@ -460,8 +460,7 @@ class UserAnalytics:
         FROM AvgRatings
         ORDER BY avg_rating DESC
         LIMIT 10;
-                        """).fetchdf()
-
+                        """).fetchdf().to_dict(orient='records')
 
         return {"movies_reviewed": movies_reviewed, "shows_reviewed": shows_reviewed, "hours_watched": hours_watched,
                 "most_common_countries": most_common_countries, "mean_daily_reviews": mean_daily_reviews,
@@ -482,7 +481,6 @@ class UserAnalytics:
                 "top_10_genres_by_average_rating": top_10_genres_by_average_rating,
                 "top_10_nanogenres_by_average_rating": top_10_nanogenres_by_average_rating,
                 "top_10_themes_by_average_rating": top_10_themes_by_average_rating}
-
 
     def close(self):
         self.conn.close()
