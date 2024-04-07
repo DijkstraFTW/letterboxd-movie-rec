@@ -23,7 +23,7 @@ dag = DAG(
 # Scraping the user's Reviews
 
 # request args
-username = "youssef"
+username = "cuqui"
 data_opt_out = False
 user_reviews = []
 
@@ -47,7 +47,10 @@ def scraping_user_reviews():
             mongodb.insert_users(client, user)
             mongodb.insert_ratings(client, ratings)
 
+        return user, ratings
+
     mongodb.close_conn_to_db(client)
+    return None
 
 
 task_scraping_user_reviews = PythonOperator(task_id='scraping_user_reviews', python_callable=scraping_user_reviews,
@@ -56,10 +59,11 @@ task_scraping_user_reviews = PythonOperator(task_id='scraping_user_reviews', pyt
 
 # Scraping Movies and Shows
 def scraping_user_movies_shows():
+
     mongodb = MongoDBClient()
     client = mongodb.open_conn_to_db()
 
-    movies_scraped_set = set(mongodb.read_all_movies())
+    movies_scraped_set = set(mongodb.read_all_movies(client))
     movies_list_set = set([item["movie_title"] for item in user_reviews])
 
     common_movies_list = list(movies_scraped_set.intersection(movies_list_set))
@@ -71,7 +75,7 @@ def scraping_user_movies_shows():
         posters = scraping_movies.get_movie_posters(movie)
         themes = scraping_movies.get_movie_themes(movie)
         nanogenres = scraping_movies.get_movie_nanogenres(movie)
-        themoviedb = scraping_movies.get_rich_data(movie, movie["type"])
+        themoviedb = scraping_movies.get_themoviedb_data(movie, movie["type"])
         combined_movie_item = {**movie, **posters, **themes, **nanogenres, **themoviedb}
         if combined_movie_item["type"] != "none":
             mongodb.insert_movies(client, combined_movie_item)

@@ -1,7 +1,7 @@
 from processing.utils.utils import select_last_model
 
 
-class HybridFilteringModel() :
+class HybridFilteringModel :
 
     def __init__(self) :
         self.algo = select_last_model("colab_filtering_")

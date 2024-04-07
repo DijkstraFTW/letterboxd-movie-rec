@@ -11,16 +11,26 @@ class UserAnalytics:
         self.user_movies = pd.DataFrame(movies)
 
     def set_user_history_reviews(self):
+        """
+        Sets the user history reviews table in duckdb
+        """
         self.conn.execute(
             "CREATE TABLE reviews (movie_title VARCHAR, rating_date DATE, rating_val INTEGER, user_id VARCHAR, is_rewatch BOOLEAN, is_review BOOLEAN, is_liked BOOLEAN)")
         self.conn.register('reviews', self.user_reviews)
 
     def set_user_history_movies(self):
+        """
+        Sets the user history movies table in duckdb
+        """
         self.conn.execute(
             """CREATE TABLE movies (movie_title_formatted VARCHAR,movie_title VARCHAR,type VARCHAR,year_released INTEGER,imdb_link VARCHAR,tmdb_link VARCHAR,imdb_id VARCHAR,tmdb_id VARCHAR,poster_url VARCHAR,genres VARCHAR,production_countries VARCHAR,spoken_languages VARCHAR,popularity FLOAT,overview VARCHAR,runtime INTEGER,vote_average FLOAT,vote_count INTEGER,release_date DATE,original_language VARCHAR,last_updated TIMESTAMP,themes VARCHAR,nanogenres VARCHAR)""")
         self.conn.register('movies', self.user_movies)
 
     def get_basic_metrics(self):
+        """
+        Returns basic metrics about the user's reviews and movies history
+        :return: dictionary : dictionary with basic metrics
+        """
         movies_reviewed = self.conn.execute("SELECT COUNT(*) FROM movies WHERE type = 'movie'").fetchone()[0]
         shows_reviewed = self.conn.execute("SELECT COUNT(*) FROM movies WHERE type = 'shows'").fetchone()[0]
         hours_watched = self.conn.execute("SELECT SUM(runtime) FROM movies").fetchone()[0]

@@ -14,7 +14,7 @@ class ColaborativeFiltering:
     def prepare_dataset(self, df_ratings):
         """
         Prepares the ratings data for training and testing
-        :rtype: tuple : returns a tuple containing the training set and the testing set
+        :rtype: returns the training set and the testing set
         """
 
         # Splitting the ratings data for training and testing
@@ -32,7 +32,7 @@ class ColaborativeFiltering:
 
     def train_model(self, trainset, testset):
         """
-        Trains an SVDpp colaborative filtering model using the user ratings
+        Fits an SVDpp colaborative filtering model using the user ratings
         :rtype: str: returns the saved model path
         """
 
@@ -55,7 +55,7 @@ class ColaborativeFiltering:
         print(f"RMSE score : {rmse_value}")
         print("Model trained successfully !")
 
-        # Savibg the model
+        # Saving the model
         model_filename = f"models/colab_filtering_{datetime.now().strftime("%Y%m%d%H%M%S")}.pkl"
         with open(model_filename, 'wb') as file:
             pickle.dump(algo, file)

@@ -7,6 +7,10 @@ from processing.utils.utils import remove_stopwords, create_bag_of_words
 class DataLoader:
 
     def load_ratings(self):
+        """
+        Loads the ratings data from the MongoDB database
+        :return: dataframe : dataframe containing all ratings
+        """
 
         # Loading the ratings data
         ratings_list = []
@@ -35,6 +39,10 @@ class DataLoader:
         return df_ratings
 
     def load_movies(self):
+        """
+        Loads the movies data from the MongoDB database
+        :return: dataframe : dataframe containing all movies
+        """
 
         # Loading the movies data
         movies_list = []
@@ -66,7 +74,7 @@ class DataLoader:
     def combine_movies_ratings(self, df_ratings, df_movies):
         """
         Prepares the merged ratings and movies data
-        :rtype: dataframe : dataframe containing all ratings and movies
+        :return: dataframe : dataframe containing all ratings and movies
         """
 
         # Merging the two dataframes

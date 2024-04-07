@@ -8,7 +8,7 @@ from nltk.tokenize import word_tokenize
 def remove_stopwords(text):
     """
     Removes stopwords and punctuation from a string
-    :rtype: str : the text filtered
+    :return: str : the text filtered
     """
 
     words = word_tokenize(str(text))
@@ -25,7 +25,7 @@ def remove_stopwords(text):
 def create_bag_of_words(x):
     """
     Combines multiple words into a single bag of words
-    :rtype: str : the bag of words
+    :return: str : the bag of words
     """
 
     overview = x.get('overview_cleaned', '')
@@ -42,7 +42,7 @@ def create_bag_of_words(x):
 def select_last_model(directory):
     """
     Selects the most recent collaborative filtering model
-    :rtype: object : path of the latest collaborative filtering model
+    :return: object : path of the latest collaborative filtering model
     """
 
     list_of_files = os.listdir(directory)
@@ -60,7 +60,7 @@ def select_last_model(directory):
 def val2stars(index):
     """
     Converts a numerical value to a star rating
-    :rtype: str : the star rating
+    :return: str : the star rating
     """
 
     return f"{index * 2}"

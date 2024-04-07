@@ -23,6 +23,12 @@ class ScrapingMovies:
         self.movies_list = movies_list
 
     def get_letterboxd_movies(self, url, movie_title_format):
+        """
+        Get movie data from letterboxd
+        :param url: url of the movie on letterboxd
+        :param movie_title_format: movie unique identifier
+        :return: dictionary : dictionary containing movie data from letterboxd
+        """
 
         response = requests.get(url)
         soup = BeautifulSoup(response.text, features="html.parser")
@@ -92,10 +98,10 @@ class ScrapingMovies:
                 if string == "":
                     film_hist[f"{stars}"] = 0
                 else:
-                    Nratings = re.findall(r'\d+', string)[:-1]
-                    Nratings = int(''.join(Nratings))
-                    film_hist[f"{stars}"] = Nratings
-                    tot_ratings += Nratings
+                    num_ratings = re.findall(r'\d+', string)[:-1]
+                    num_ratings = int(''.join(num_ratings))
+                    film_hist[f"{stars}"] = num_ratings
+                    tot_ratings += num_ratings
         except:
             tot_ratings = ""
 
@@ -110,6 +116,11 @@ class ScrapingMovies:
         return movie_object
 
     def get_movie_poster(self, movie_title_format):
+        """
+        Get movie poster from letterboxd
+        :param movie_title_format: movie unique identifier
+        :return: dictionary : dictionary containing movie poster url
+        """
 
         response = requests.get(self.posters_url.format(movie_title_format))
         soup = BeautifulSoup(response.text, features="html.parser")
@@ -124,6 +135,11 @@ class ScrapingMovies:
         return dict({"poster_url": image_url})
 
     def get_movie_themes(self, movie_title_format):
+        """
+        Get movie themes from letterboxd
+        :param movie_title_format: movie unique identifier
+        :return: dictionary : dictionary containing movie themes
+        """
 
         response = requests.get(self.movies_themes_url.format(movie_title_format))
         soup = BeautifulSoup(response.text, features="html.parser")
@@ -141,6 +157,11 @@ class ScrapingMovies:
         return dict({"themes": themes})
 
     def get_movie_nanogenres(self, movie_title_format):
+        """
+        Get movie nanogenres from letterboxd
+        :param movie_title_format: movie unique identifier
+        :return: dictionary : dictionary containing movie nanogenres
+        """
 
         response = requests.get(self.movies_nanogenres_url.format(movie_title_format))
         soup = BeautifulSoup(response.text, features="html.parser")
@@ -158,6 +179,11 @@ class ScrapingMovies:
         return dict({"nanogenres": nanogenres})
 
     def fetch_themoviedb_data(self, url):
+        """
+        Fetch movie data from themoviedb
+        :param url: url of the movie on themoviedb
+        :return: dictionary : dictionary containing movie data from themoviedb
+        """
 
         movie_object = {}
         nested_fields = ["genres", "production_countries", "spoken_languages"]
@@ -184,6 +210,10 @@ class ScrapingMovies:
         return movie_object
 
     def get_rated_movies(self):
+        """
+        Get rated movies from letterboxd
+        :return: list : list of dictionaries containing rated movies data from letterboxd
+        """
         result = []
         for movie in self.movies_list:
             movie_data = self.get_letterboxd_movies(self.movies_url.format(movie), movie)
@@ -191,21 +221,48 @@ class ScrapingMovies:
         return result
 
     def get_movie_posters(self, movie):
+        """
+        Fetch movie posters from letterboxd based on movie title
+        :param movie: movie object
+        :return: dictionary : dictionary containing movie poster urls
+        """
         return dict(self.get_movie_poster(movie["movie_title_formatted"]))
 
     def get_movies_themes(self, movie):
+        """
+        Fetch movie themes from letterboxd based on movie title
+        :param movie: movie object
+        :return: dictionary : dictionary containing movie themes
+        """
         return dict(self.get_movie_themes(movie["movie_title_formatted"]))
 
     def get_movies_nanogenres(self, movie):
+        """
+        Fetch movie nanogenres from letterboxd based on movie title
+        :param movie: movie object
+        :return: dictionary : dictionary containing movie nanogenres
+        """
         return dict(self.get_movie_nanogenres(movie["movie_title_formatted"]))
 
-    def get_rich_data(self, movie, type):
+    def get_themoviedb_data(self, movie, type):
+        """
+        Fetch data from themoviedb based on movie title
+        :param movie: movie object
+        :param type: type of movie (movie or tv) :/
+        :return: dictionary : dictionary containing movie data from themoviedb
+        """
         if type != "none":
             return dict(
                 self.fetch_themoviedb_data(self.themoviedb_url.format(type, movie["tmdb_id"], self.themoviedb_key)))
         return {}
 
     def get_movie_reviews(self, movie_title_format, num_pages):
+        """
+        Get movie reviews from letterboxd
+        :param movie_title_format: movie unique identifier
+        :param num_pages: number of review pages to scrape
+        :return: list : list of dictionaries containing movie reviews data from letterboxd
+        """
 
         reviews = []
 

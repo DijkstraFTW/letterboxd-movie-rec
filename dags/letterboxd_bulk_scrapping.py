@@ -51,7 +51,7 @@ def scraping_movies_shows():
 
     for movie in letterboxd_movies:
         posters = scraping_movies.get_movie_posters(movie)
-        themoviedb = scraping_movies.get_rich_data(movie, movie["type"])
+        themoviedb = scraping_movies.get_themoviedb_data(movie, movie["type"])
         themes = scraping_movies.get_movies_themes(movie)
         nanogenres = scraping_movies.get_movies_nanogenres(movie)
         combined_movie_item = {**movie, **posters, **themoviedb, **themes, **nanogenres}

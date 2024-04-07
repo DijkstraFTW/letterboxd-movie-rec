@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     for movie in letterboxd_movies:
         posters = scraping_movies.get_movie_posters(movie)
-        themoviedb = scraping_movies.get_rich_data(movie, movie["type"])
+        themoviedb = scraping_movies.get_themoviedb_data(movie, movie["type"])
         combined_movie_item = {**movie, **posters, **themoviedb}
         mongodb.insert_movies(client, combined_movie_item)
 
