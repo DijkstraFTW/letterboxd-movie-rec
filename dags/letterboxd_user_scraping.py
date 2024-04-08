@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime
+from datetime import timedelta
 from airflow.models import Variable
 from airflow.decorators import dag, task
 from dotenv import load_dotenv
@@ -7,10 +7,11 @@ from database.MongoDBClient import *
 from processing.analytics.UserAnalytics import UserAnalytics
 from processing.scraping.ScrapingMovies import *
 from processing.scraping.ScrapingUserReviews import *
+from prediction.CollaborativeFilteringModel import *
 
 load_dotenv()
 
-default_args = {'owner': 'airflow', 'start_date': datetime.datetime(2024, 1, 1), 'depends_on_past': False, 'retries': 1,
+default_args = {'owner': 'airflow', 'start_date': datetime(2024, 1, 1), 'depends_on_past': False, 'retries': 1,
                 'retry_delay': timedelta(minutes=5)}
 
 
@@ -44,7 +45,7 @@ def letterboxd_user_recommendation():
             user_reviews = mongodb.get_reviews_by_user_id(client, user_id)
 
         mongodb.close_conn_to_db(client)
-        return user_reviews
+        return user_reviews, user_id
 
     # Scraping the user's movies and shows
     @task
@@ -74,10 +75,25 @@ def letterboxd_user_recommendation():
 
     # Getting user recommendations
     @task
-    def get_user_recommendations(user_reviews: list, user_movies: list):
-        user_recommendations = []
-        ## TODO: get user recommendations
-        return user_recommendations
+    def get_user_recommendations(user_reviews: list, user_id: str, type: str = "new"):
+        user_recs = []
+
+        mongodb = MongoDBClient()
+        client = mongodb.open_conn_to_db()
+        reviews = mongodb.read_all_ratings(client)
+        movies = mongodb.read_all_movies(client)
+        reviews = user_reviews + reviews
+
+        collaborative_filtering = CollaborativeFilteringModel(reviews, movies)
+        trainset, testset = collaborative_filtering.prepare_dataset()
+        collaborative_filtering.train_model(trainset, testset)
+
+        if type == "letterboxd":
+            user_recs = collaborative_filtering.generate_recommendation(user_id, 20)
+        elif type == "new":
+            user_recs = collaborative_filtering.get_weighted_recommendations(40)
+
+        return user_recs
 
     # Getting user analytics
     @task
@@ -87,14 +103,16 @@ def letterboxd_user_recommendation():
         user_analytics.set_user_history_movies()
         user_analytics.set_user_history_reviews()
         user_analytics_data = user_analytics.get_basic_metrics()
+
         return user_analytics_data
 
     username = Variable.get("username")
+    type = Variable.get("type")
     data_opt_out = Variable.get("data_opt_out", default_var=False, deserialize_json=True)
 
-    user_reviews = scraping_user_reviews(username, data_opt_out)
+    user_reviews, user_id = scraping_user_reviews(username, data_opt_out)
     user_movies_shows = scraping_user_movies_shows(user_reviews)
-    user_recommendation = get_user_recommendations(user_reviews, user_movies_shows)
+    user_recommendation = get_user_recommendations(user_reviews, user_id, type)
     user_analytics = get_user_analytics(user_reviews, user_movies_shows)
 
     user_movies_shows >> user_recommendation
