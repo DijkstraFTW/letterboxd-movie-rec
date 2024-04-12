@@ -4,6 +4,7 @@ import certifi
 import numpy as np
 from pymongo import MongoClient
 
+
 class MongoDBClient:
 
     def __init__(self):
@@ -11,7 +12,8 @@ class MongoDBClient:
         self.password = os.getenv('MONGO_PASSWORD')
         self.cluster = os.getenv('MONGO_CLUSTER')
         self.database = os.getenv('MONGO_DATABASE')
-        self.URI = "mongodb+srv://" + str(self.username) + ':' + str(self.password) + "@" + str(self.cluster) + "/?retryWrites=true&w=majority"
+        self.URI = "mongodb+srv://" + str(self.username) + ':' + str(self.password) + "@" + str(
+            self.cluster) + "/?retryWrites=true&w=majority"
 
     def open_conn_to_db(self):
         try:
@@ -56,7 +58,8 @@ class MongoDBClient:
             collection.insert_one(movie)
             print("Successfully added movie data to MongoDB instance!")
         except Exception as e:
-            print("Error adding {} : {} movie to MongoDB : " + str(e).format(movie["movie_title"], movie["release_date"]))
+            print(
+                "Error adding {} : {} movie to MongoDB : " + str(e).format(movie["movie_title"], movie["release_date"]))
 
     def read_all_movies(self, client):
         try:
@@ -116,8 +119,6 @@ class MongoDBClient:
         except Exception as e:
             print("Error getting reviews from MongoDB: " + str(e))
             return []
-
-
 
     def insert_embeddings(self, client, embeddings, df_merged):
         try:

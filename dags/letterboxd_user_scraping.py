@@ -4,6 +4,7 @@ from airflow.decorators import dag, task
 from dotenv import load_dotenv
 
 from database.MongoDBClient import *
+from messaging.RedisClient import *
 from processing.analytics.UserAnalytics import UserAnalytics
 from processing.scraping.ScrapingMovies import *
 from processing.scraping.ScrapingUserReviews import *
@@ -106,6 +107,13 @@ def letterboxd_user_recommendation():
 
         return user_analytics_data
 
+    # Writing to Redis
+    @task
+    def write_to_redis(user_recommendation: list, user_analytics: dict):
+        redis_client = RedisClient()
+        redis_client.publish_recs_analytics(user_recommendation, user_analytics)
+
+
     username = Variable.get("username")
     type = Variable.get("type")
     data_opt_out = Variable.get("data_opt_out", default_var=False, deserialize_json=True)
@@ -114,6 +122,7 @@ def letterboxd_user_recommendation():
     user_movies_shows = scraping_user_movies_shows(user_reviews)
     user_recommendation = get_user_recommendations(user_reviews, user_id, type)
     user_analytics = get_user_analytics(user_reviews, user_movies_shows)
+    write_to_redis(user_recommendation, user_analytics)
 
     user_movies_shows >> user_recommendation
     user_movies_shows >> user_analytics
