@@ -154,6 +154,15 @@ class UserAnalytics:
             decade;
         """).fetchdf().to_dict(orient='records')
 
+        average_watched_per_day_of_week = self.conn.execute("""
+        SELECT
+            EXTRACT(ISODOW FROM rating_date) AS day_of_week,
+            COUNT(*) / COUNT(DISTINCT rating_date) AS average_movies_watched
+        FROM reviews
+        GROUP BY day_of_week
+        ORDER BY day_of_week;
+        """).fetchdf().to_dict(orient='records')
+
         top_10_movies_decade = self.conn.execute("""
         WITH DecadeMovies AS (
             SELECT
@@ -480,7 +489,8 @@ class UserAnalytics:
                 "top_10_nanogenres_by_watch_count": top_10_nanogenres_by_watch_count,
                 "top_10_genres_by_average_rating": top_10_genres_by_average_rating,
                 "top_10_nanogenres_by_average_rating": top_10_nanogenres_by_average_rating,
-                "top_10_themes_by_average_rating": top_10_themes_by_average_rating}
+                "top_10_themes_by_average_rating": top_10_themes_by_average_rating,
+                "average_watched_per_day_of_week": average_watched_per_day_of_week}
 
     def close(self):
         self.conn.close()
