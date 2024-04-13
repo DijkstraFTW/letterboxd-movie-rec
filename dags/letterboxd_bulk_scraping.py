@@ -1,3 +1,7 @@
+import sys
+
+sys.path.insert(0, "/home/ubuntu/app/")
+
 from datetime import timedelta
 
 from airflow.decorators import dag, task
@@ -13,9 +17,9 @@ default_args = {'owner': 'DijkstraFTW', 'start_date': datetime.datetime(2024, 1,
                 'retries': 1, 'retry_delay': timedelta(minutes=5)}
 
 
-@dag('letterboxd_scraping_dag', default_args=default_args, schedule='0 3 1 * *', catchup=False,
+@dag('letterboxd_bulk_scraping_dag', default_args=default_args, schedule='0 3 1 * *', catchup=False,
      description='Scraping Letterboxd data and storing it in MongoDB')
-def letterboxd_scraping_dag():
+def letterboxd_bulk_scraping():
     # Scraping Users and Reviews
     @task
     def scraping_users_reviews():
@@ -54,8 +58,10 @@ def letterboxd_scraping_dag():
 
         mongodb.close_conn_to_db(client)
 
-    scraping_users_reviews()
-    scraping_movies_shows()
+    scrape_users_reviews_task = scraping_users_reviews()
+    scrape_movies_shows_task = scraping_movies_shows()
+
+    scrape_users_reviews_task >> scrape_movies_shows_task
 
 
-letterboxd_scraping = letterboxd_scraping_dag()
+letterboxd_bulk_scraping = letterboxd_bulk_scraping()

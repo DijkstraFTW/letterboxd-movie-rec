@@ -1,3 +1,7 @@
+import sys
+
+sys.path.insert(0, "/home/ubuntu/app/")
+
 from datetime import timedelta
 
 from airflow.decorators import dag, task
@@ -16,7 +20,7 @@ default_args = {'owner': 'DijkstraFTW', 'start_date': datetime.datetime(2024, 1,
                 'retries': 1, 'retry_delay': timedelta(minutes=5), "provide_context": True}
 
 
-@dag('letterboxd_scrapping_dag', default_args=default_args, schedule=None,
+@dag('letterboxd_recommendation_dag', default_args=default_args, schedule=None,
      description='Scrapes user reviews from Letterboxd and provides recommendations based on stored '
                  'users watch history.')
 def letterboxd_user_recommendation(**kwargs):
@@ -33,10 +37,10 @@ def letterboxd_user_recommendation(**kwargs):
             type = 'default_type'
             data_opt_out = False
 
-        return dict(username=username, type=type, data_opt_out=data_opt_out)
+        return username, type, data_opt_out
 
     # Scraping the user's reviews
-    @task(multiple_outputs=True)
+    @task()
     def scraping_user_reviews(username: str, data_opt_out: bool):
 
         # check if user exists already
@@ -126,7 +130,7 @@ def letterboxd_user_recommendation(**kwargs):
 
     # Writing to Redis
     @task
-    def write_to_redis(username:str, user_recommendation: list, user_analytics: dict):
+    def write_to_redis(username: str, user_recommendation: list, user_analytics: dict):
         redis_client = RedisClient()
         redis_client.publish_recs_analytics(username, user_recommendation, user_analytics)
 
@@ -138,8 +142,5 @@ def letterboxd_user_recommendation(**kwargs):
     user_analytics = get_user_analytics(context_output["username"], reviews_output["user_reviews"], user_movies_shows)
     write_to_redis(context_output["username"], user_recommendation, user_analytics)
 
-    user_movies_shows >> user_recommendation
-    user_movies_shows >> user_analytics
 
-
-letterboxd_scraping = letterboxd_user_recommendation()
+letterboxd_user_recommendation = letterboxd_user_recommendation()

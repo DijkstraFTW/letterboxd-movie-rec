@@ -9,8 +9,8 @@ class ScrapingUserReviews:
     def __init__(self):
         self.popular_users_url = "https://letterboxd.com/members/popular/this/week/page/{}/"
         self.user_page_url = "https://letterboxd.com/{}/"
-        self.users_diary_page_number_url = "https://letterboxd.com/mistat/films/diary/by/added/"
-        self.users_diary_pages_url = "https://letterboxd.com/mistat/films/diary/by/added/page/{}/"
+        self.users_diary_page_number_url = "https://letterboxd.com/{}/films/diary/by/added/"
+        self.users_diary_pages_url = "https://letterboxd.com/{}/films/diary/by/added/page/{}/"
         self.users_grid_page_number_url = "https://letterboxd.com/{}/films/by/date/"
         self.users_grid_pages_url = "https://letterboxd.com/{}/films/by/date/page/{}/"
         self.num_top_users_pages = 10
