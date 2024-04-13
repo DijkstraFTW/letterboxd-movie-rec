@@ -10,11 +10,11 @@ from processing.scraping.ScrapingUserReviews import *
 load_dotenv()
 
 default_args = {'owner': 'DijkstraFTW', 'start_date': datetime.datetime(2024, 1, 1), 'depends_on_past': False,
-                'retries': 1, 'retry_delay': timedelta(minutes=5),
-                'description': 'Scraping Letterboxd data and storing it in MongoDB'}
+                'retries': 1, 'retry_delay': timedelta(minutes=5)}
 
 
-@dag('letterboxd_scraping_dag', default_args=default_args, schedule_interval='0 3 1 * *', catchup=False)
+@dag('letterboxd_scraping_dag', default_args=default_args, schedule='0 3 1 * *', catchup=False,
+     description='Scraping Letterboxd data and storing it in MongoDB')
 def letterboxd_scraping_dag():
     # Scraping Users and Reviews
     @task
@@ -54,8 +54,8 @@ def letterboxd_scraping_dag():
 
         mongodb.close_conn_to_db(client)
 
-    user_ratings = scraping_users_reviews()
-    scraping_movies_shows(user_ratings)
+    scraping_users_reviews()
+    scraping_movies_shows()
 
 
 letterboxd_scraping = letterboxd_scraping_dag()

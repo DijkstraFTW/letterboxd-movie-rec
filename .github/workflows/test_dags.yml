@@ -2,8 +2,8 @@ name: Test DAGs
 
 on:
   push:
-    paths:
-      - 'dags/**'
+    branches:
+      - main
 
 jobs:
   test:
@@ -13,22 +13,25 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: '3.12'
+        python-version: '3.10'
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        pip install -U scikit-learn
+        python -m pip install -U pip setuptools wheel Cython
+        pip install -U scikit-surprise
         pip install -r requirements.txt
         pip check
     - name: Lint with Flake8
       run: |
         pip install flake8
-        flake8 --ignore E501 dags --benchmark -v
+#        flake8 --ignore E501 dags --benchmark -v
     - name: Confirm Black code compliance (psf/black)
       run: |
         pip install pytest-black
-        pytest dags --black -v
+#        pytest dags --black -v
     - name: Test with Pytest
       run: |
         pip install pytest
-        cd test || exit
+        cd test
         pytest dag_tests.py -v

@@ -1,7 +1,6 @@
 from datetime import timedelta
 
 from airflow.decorators import dag, task
-from airflow.models import Variable
 from dotenv import load_dotenv
 
 from database.MongoDBClient import *
@@ -13,17 +12,32 @@ from processing.scraping.ScrapingUserReviews import *
 
 load_dotenv()
 
-default_args = {'owner': 'DijkstraFTW', 'start_date': datetime(2024, 1, 1), 'depends_on_past': False, 'retries': 1,
-                'retry_delay': timedelta(minutes=5),
-                'description': 'Scrapes user reviews from Letterboxd and provides recommendations based on stored '
-                               'users watch history.'}
+default_args = {'owner': 'DijkstraFTW', 'start_date': datetime.datetime(2024, 1, 1), 'depends_on_past': False,
+                'retries': 1, 'retry_delay': timedelta(minutes=5), "provide_context": True}
 
 
-@dag('letterboxd_scrapping_dag', default_args=default_args, schedule_interval='0 3 1 * *')
-def letterboxd_user_recommendation():
+@dag('letterboxd_scrapping_dag', default_args=default_args, schedule=None,
+     description='Scrapes user reviews from Letterboxd and provides recommendations based on stored '
+                 'users watch history.')
+def letterboxd_user_recommendation(**kwargs):
+    # Setting up the context
+    @task(multiple_outputs=True)
+    def setup_context():
+        dag_run = kwargs.get('dag_run', None)
+        if dag_run and dag_run.conf:
+            username = dag_run.conf.get('username', 'default_username')
+            type = dag_run.conf.get('type', 'default_type')
+            data_opt_out = dag_run.conf.get('data_opt_out', False)
+        else:
+            username = 'default_username'
+            type = 'default_type'
+            data_opt_out = False
+
+        return dict(username=username, type=type, data_opt_out=data_opt_out)
+
     # Scraping the user's reviews
-    @task
-    def scraping_user_reviews():
+    @task(multiple_outputs=True)
+    def scraping_user_reviews(username: str, data_opt_out: bool):
 
         # check if user exists already
         mongodb = MongoDBClient()
@@ -101,7 +115,7 @@ def letterboxd_user_recommendation():
 
     # Getting user analytics
     @task
-    def get_user_analytics(user_reviews: list, user_movies: list):
+    def get_user_analytics(username: str, user_reviews: list, user_movies: list):
 
         user_analytics = UserAnalytics(username, user_reviews, user_movies)
         user_analytics.set_user_history_movies()
@@ -112,19 +126,17 @@ def letterboxd_user_recommendation():
 
     # Writing to Redis
     @task
-    def write_to_redis(user_recommendation: list, user_analytics: dict):
+    def write_to_redis(username:str, user_recommendation: list, user_analytics: dict):
         redis_client = RedisClient()
-        redis_client.publish_recs_analytics(user_recommendation, user_analytics)
+        redis_client.publish_recs_analytics(username, user_recommendation, user_analytics)
 
-    username = Variable.get("username")
-    type = Variable.get("type")
-    data_opt_out = Variable.get("data_opt_out", default_var=False, deserialize_json=True)
-
-    user_reviews, user_id = scraping_user_reviews(username, data_opt_out)
-    user_movies_shows = scraping_user_movies_shows(user_reviews)
-    user_recommendation = get_user_recommendations(user_reviews, user_id, type)
-    user_analytics = get_user_analytics(user_reviews, user_movies_shows)
-    write_to_redis(user_recommendation, user_analytics)
+    context_output = setup_context()
+    reviews_output = scraping_user_reviews(context_output["username"], context_output["data_opt_out"])
+    user_movies_shows = scraping_user_movies_shows(reviews_output["user_reviews"])
+    user_recommendation = get_user_recommendations(reviews_output["user_reviews"], reviews_output["user_id"],
+                                                   context_output["type"])
+    user_analytics = get_user_analytics(context_output["username"], reviews_output["user_reviews"], user_movies_shows)
+    write_to_redis(context_output["username"], user_recommendation, user_analytics)
 
     user_movies_shows >> user_recommendation
     user_movies_shows >> user_analytics
