@@ -1,4 +1,5 @@
-from datetime import timedelta, datetime
+from datetime import timedelta
+
 from airflow.decorators import dag, task
 from dotenv import load_dotenv
 
@@ -8,11 +9,13 @@ from processing.scraping.ScrapingUserReviews import *
 
 load_dotenv()
 
-default_args = {'owner': 'airflow', 'start_date': datetime.datetime(2024, 1, 1), 'depends_on_past': False, 'retries': 1, 'retry_delay': timedelta(minutes=5)}
+default_args = {'owner': 'DijkstraFTW', 'start_date': datetime.datetime(2024, 1, 1), 'depends_on_past': False,
+                'retries': 1, 'retry_delay': timedelta(minutes=5),
+                'description': 'Scraping Letterboxd data and storing it in MongoDB'}
+
 
 @dag('letterboxd_scraping_dag', default_args=default_args, schedule_interval='0 3 1 * *', catchup=False)
 def letterboxd_scraping_dag():
-
     # Scraping Users and Reviews
     @task
     def scraping_users_reviews():
@@ -28,7 +31,6 @@ def letterboxd_scraping_dag():
             mongodb.insert_ratings(client, scraping_user_reviews.get_user_ratings(user['username'], user['user_id']))
 
         mongodb.close_conn_to_db(client)
-
 
     # Scraping Movies and Shows
     @task
@@ -55,5 +57,5 @@ def letterboxd_scraping_dag():
     user_ratings = scraping_users_reviews()
     scraping_movies_shows(user_ratings)
 
-letterboxd_scraping = letterboxd_scraping_dag()
 
+letterboxd_scraping = letterboxd_scraping_dag()

@@ -1,19 +1,22 @@
 from datetime import timedelta
-from airflow.models import Variable
+
 from airflow.decorators import dag, task
+from airflow.models import Variable
 from dotenv import load_dotenv
 
 from database.MongoDBClient import *
 from messaging.RedisClient import *
+from prediction.CollaborativeFilteringModel import *
 from processing.analytics.UserAnalytics import UserAnalytics
 from processing.scraping.ScrapingMovies import *
 from processing.scraping.ScrapingUserReviews import *
-from prediction.CollaborativeFilteringModel import *
 
 load_dotenv()
 
-default_args = {'owner': 'airflow', 'start_date': datetime(2024, 1, 1), 'depends_on_past': False, 'retries': 1,
-                'retry_delay': timedelta(minutes=5)}
+default_args = {'owner': 'DijkstraFTW', 'start_date': datetime(2024, 1, 1), 'depends_on_past': False, 'retries': 1,
+                'retry_delay': timedelta(minutes=5),
+                'description': 'Scrapes user reviews from Letterboxd and provides recommendations based on stored '
+                               'users watch history.'}
 
 
 @dag('letterboxd_scrapping_dag', default_args=default_args, schedule_interval='0 3 1 * *')
@@ -112,7 +115,6 @@ def letterboxd_user_recommendation():
     def write_to_redis(user_recommendation: list, user_analytics: dict):
         redis_client = RedisClient()
         redis_client.publish_recs_analytics(user_recommendation, user_analytics)
-
 
     username = Variable.get("username")
     type = Variable.get("type")

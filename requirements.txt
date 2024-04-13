@@ -16,3 +16,9 @@ soupsieve==2.5
 tqdm==4.66.1
 tzdata==2023.4
 urllib3==2.1.0
+airflow==2.2.3
+redis==4.1.1
+sklearn
+surprise
+nltk==3.6.5
+

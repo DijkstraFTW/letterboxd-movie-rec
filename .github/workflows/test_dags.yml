@@ -1,0 +1,34 @@
+name: Test DAGs
+
+on:
+  push:
+    paths:
+      - 'dags/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.12'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip check
+    - name: Lint with Flake8
+      run: |
+        pip install flake8
+        flake8 --ignore E501 dags --benchmark -v
+    - name: Confirm Black code compliance (psf/black)
+      run: |
+        pip install pytest-black
+        pytest dags --black -v
+    - name: Test with Pytest
+      run: |
+        pip install pytest
+        cd test || exit
+        pytest dag_tests.py -v
