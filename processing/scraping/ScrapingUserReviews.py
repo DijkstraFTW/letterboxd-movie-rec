@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 class ScrapingUserReviews:
 
     def __init__(self):
-        self.popular_users_url = "https://letterboxd.com/members/popular/this/week/page/{}/"
+        self.popular_users_url = "https://letterboxd.com/members/popular/this/month/page/{}/"
         self.user_page_url = "https://letterboxd.com/{}/"
         self.users_diary_page_number_url = "https://letterboxd.com/{}/films/diary/by/added/"
         self.users_diary_pages_url = "https://letterboxd.com/{}/films/diary/by/added/page/{}/"
@@ -23,7 +23,7 @@ class ScrapingUserReviews:
         """
         users = []
 
-        for page in range(self.num_top_users_pages):
+        for page in range(1, self.num_top_users_pages):
 
             r = requests.get(self.popular_users_url.format(page))
             soup = BeautifulSoup(r.text, "html.parser")
