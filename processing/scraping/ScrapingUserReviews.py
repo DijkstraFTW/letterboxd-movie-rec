@@ -156,7 +156,7 @@ class ScrapingUserReviews:
 
         likes = []
 
-        for i in range(self.num_user_ratings_pages):
+        for i in range(1, self.num_user_ratings_pages):
 
             page = requests.get(self.users_grid_pages_url.format(username, i + 1), {"username": username})
             response = BeautifulSoup(page.text, features="html.parser")
@@ -190,7 +190,7 @@ class ScrapingUserReviews:
         nb_diary_pages = self.get_diary_reviews_page_count(username)
         nb_grid_pages = self.get_grid_reviews_page_count(username)
 
-        for i in range(nb_diary_pages):
+        for i in range(1, nb_diary_pages):
             page = requests.get(self.users_diary_pages_url.format(username, i + 1), {"username": username})
             response = BeautifulSoup(page.text, features="html.parser")
             rating = self.get_ratings_data(response, user_id, return_unrated=return_unrated)
