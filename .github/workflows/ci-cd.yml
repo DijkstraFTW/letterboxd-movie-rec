@@ -14,6 +14,7 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: '3.10'
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -22,16 +23,17 @@ jobs:
         pip install -U scikit-surprise
         pip install -r requirements.txt
         pip check
+
     - name: Lint with Flake8
       run: |
         pip install flake8
         flake8 --ignore=E402 --max-line-length=120  dags --benchmark -v
         flake8 --max-line-length=120  database --benchmark -v
         flake8 --max-line-length=120  messaging --benchmark -v
-#        TODO: other prediction files
         flake8 --ignore=W504 --max-line-length=120  prediction/CollaborativeFilteringModel.py --benchmark -v
         flake8 --ignore=E722 --max-line-length=120  processing --benchmark -v
         flake8 --max-line-length=120  test --benchmark -v
+
     - name: Test with Pytest
       run: |
         pip install pytest
@@ -71,7 +73,6 @@ jobs:
           chmod 400 private_key.pem
           scp -o StrictHostKeyChecking=no -o ServerAliveInterval=500 -o ServerAliveCountMax=3 -i private_key.pem -r * ${{ secrets.EC2_USER }}@${{ secrets.EC2_IP }}:/home/ubuntu/app/
           ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=500 -o ServerAliveCountMax=3 -i private_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_IP }} "chmod +x /home/ubuntu/app/deploy.sh && /home/ubuntu/app/deploy.sh"
-      
 
       - name: Revert EC2 security group changes
         if: always()
