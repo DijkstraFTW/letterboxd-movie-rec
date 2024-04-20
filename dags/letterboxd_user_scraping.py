@@ -37,7 +37,6 @@ def letterboxd_user_recommendation():
     @task(multiple_outputs=True, provide_context=True)
     def setup_context(**context):
         dag_run = context['dag_run']
-        print(dag_run)
         if dag_run and dag_run.conf:
             username = dag_run.conf['username']
             type = dag_run.conf['type']
@@ -47,7 +46,6 @@ def letterboxd_user_recommendation():
             type = 'default_type'
             data_opt_out = True
 
-        print(f"Username: {username}, Type: {type}, Data Opt Out: {data_opt_out}")
         return dict(username=username, type=type, data_opt_out=data_opt_out)
 
     # Scraping the user's reviews
@@ -58,6 +56,7 @@ def letterboxd_user_recommendation():
         mongodb = MongoDBClient()
         client = mongodb.open_conn_to_db()
         user_found = mongodb.find_user(client, username) == 1
+        print(f"Username: {username}, Data Opt Out: {data_opt_out}")
 
         # user doesn't exist
         if not user_found:
