@@ -36,6 +36,7 @@ def letterboxd_user_recommendation(**kwargs):
     def setup_context():
         dag_run = kwargs.get('dag_run', None)
         if dag_run and dag_run.conf:
+            print(dag_run.conf)
             username = dag_run.conf.get('username', 'default_username')
             type = dag_run.conf.get('type', 'default_type')
             data_opt_out = dag_run.conf.get('data_opt_out', False)
