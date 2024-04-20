@@ -34,16 +34,16 @@ def letterboxd_user_recommendation(**kwargs):
     # Setting up the context
     @task(multiple_outputs=True)
     def setup_context():
-        dag_run = kwargs.get('dag_run', None)
+        dag_run = kwargs['dag_run']
         print(dag_run)
         if dag_run and dag_run.conf:
-            username = dag_run.conf.get('username', 'default_username')
-            type = dag_run.conf.get('type', 'default_type')
-            data_opt_out = dag_run.conf.get('data_opt_out', False)
+            username = dag_run.conf['username']
+            type = dag_run.conf['type']
+            data_opt_out = dag_run.conf['data_opt_out']
         else:
             username = 'default_username'
             type = 'default_type'
-            data_opt_out = False
+            data_opt_out = True
 
         print(f"Username: {username}, Type: {type}, Data Opt Out: {data_opt_out}")
         return dict(username=username, type=type, data_opt_out=data_opt_out)
@@ -55,7 +55,7 @@ def letterboxd_user_recommendation(**kwargs):
         # check if user exists already
         mongodb = MongoDBClient()
         client = mongodb.open_conn_to_db()
-        user_found = mongodb.find_user(client, username)
+        user_found = len(mongodb.find_user(client, username))
 
         # user doesn't exist
         if user_found <= 0:
