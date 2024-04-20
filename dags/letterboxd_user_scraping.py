@@ -35,8 +35,8 @@ default_args = {
 def letterboxd_user_recommendation():
     # Setting up the context
     @task(multiple_outputs=True, provide_context=True)
-    def setup_context():
-        dag_run = DagRun.get_current(context=True)
+    def setup_context(**context):
+        dag_run = context['dag_run']
         print(dag_run)
         if dag_run and dag_run.conf:
             username = dag_run.conf['username']
