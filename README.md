@@ -13,6 +13,7 @@ The Letterboxd Movie Recommender System is a hybrid recommendation system that s
 - Webapp integration deployment
 - Monitoring
 - Logging
+- Testing
 
 ## Try it out
 
