@@ -30,9 +30,9 @@ default_args = {
 @dag('letterboxd_recommendation_dag', default_args=default_args, schedule=None,
      description='Scrapes user reviews from Letterboxd and provides recommendations based on '
                  'stored users watch history.')
-def letterboxd_user_recommendation(**kwargs):
+def letterboxd_user_recommendation():
     # Setting up the context
-    @task(multiple_outputs=True)
+    @task(multiple_outputs=True, provide_context=True)
     def setup_context(kwargs: dict):
         dag_run = kwargs['dag_run']
         print(dag_run)
@@ -145,8 +145,9 @@ def letterboxd_user_recommendation(**kwargs):
         redis_client = RedisClient()
         redis_client.publish_recs_analytics(username, user_recommendation, user_analytics)
 
-    print(kwargs['conf'])
-    context_output = setup_context(kwargs)
+    params = '{{ dag_run }}'
+    print(params)
+    context_output = setup_context(params)
     print(context_output["username"], context_output["data_opt_out"], context_output["type"])
     reviews_output = scraping_user_reviews(context_output["username"], context_output["data_opt_out"])
     user_movies_shows = scraping_user_movies_shows(reviews_output["user_reviews"])
