@@ -1,31 +1,38 @@
 import sys
+import uuid
 
 sys.path.insert(0, "/home/ubuntu/app/")
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from airflow.decorators import dag, task
 from dotenv import load_dotenv
 
-from database.MongoDBClient import *
-from messaging.RedisClient import *
-from prediction.CollaborativeFilteringModel import *
+from database.MongoDBClient import MongoDBClient
+from messaging.RedisClient import RedisClient
+from prediction.CollaborativeFilteringModel import CollaborativeFilteringModel
 from processing.analytics.UserAnalytics import UserAnalytics
-from processing.scraping.ScrapingMovies import *
-from processing.scraping.ScrapingUserReviews import *
+from processing.scraping.ScrapingMovies import ScrapingMovies
+from processing.scraping.ScrapingUserReviews import ScrapingUserReviews
 
 load_dotenv()
 
-default_args = {'owner': 'DijkstraFTW', 'start_date': datetime.datetime(2024, 1, 1), 'depends_on_past': False,
-                'retries': 1, 'retry_delay': timedelta(minutes=5), "provide_context": True}
+default_args = {
+    'owner': 'DijkstraFTW',
+    'start_date': datetime(2024, 1, 1),
+    'depends_on_past': False,
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5),
+    'provide_context': True
+}
 
 
 @dag('letterboxd_recommendation_dag', default_args=default_args, schedule=None,
-     description='Scrapes user reviews from Letterboxd and provides recommendations based on stored '
-                 'users watch history.')
+     description='Scrapes user reviews from Letterboxd and provides recommendations based on '
+                 'stored users watch history.')
 def letterboxd_user_recommendation(**kwargs):
     # Setting up the context
-    @task(multiple_outputs=True)
+    @task()
     def setup_context():
         dag_run = kwargs.get('dag_run', None)
         if dag_run and dag_run.conf:
@@ -119,14 +126,16 @@ def letterboxd_user_recommendation(**kwargs):
 
     # Getting user analytics
     @task
-    def get_user_analytics(username: str, user_reviews: list, user_movies: list):
+    def get_user_analytics(username: str, user_reviews: list, user_movies: list, type: str):
 
-        user_analytics = UserAnalytics(username, user_reviews, user_movies)
-        user_analytics.set_user_history_movies()
-        user_analytics.set_user_history_reviews()
-        user_analytics_data = user_analytics.get_basic_metrics()
+        if type == "letterboxd":
+            user_analytics = UserAnalytics(username, user_reviews, user_movies)
+            user_analytics.set_user_history_movies()
+            user_analytics.set_user_history_reviews()
+            user_analytics_data = user_analytics.get_basic_metrics()
 
-        return user_analytics_data
+            return user_analytics_data
+        return {}
 
     # Writing to Redis
     @task
@@ -139,7 +148,8 @@ def letterboxd_user_recommendation(**kwargs):
     user_movies_shows = scraping_user_movies_shows(reviews_output["user_reviews"])
     user_recommendation = get_user_recommendations(reviews_output["user_reviews"], reviews_output["user_id"],
                                                    context_output["type"])
-    user_analytics = get_user_analytics(context_output["username"], reviews_output["user_reviews"], user_movies_shows)
+    user_analytics = get_user_analytics(context_output["username"], reviews_output["user_reviews"],
+                                        user_movies_shows, context_output["type"])
     write_to_redis(context_output["username"], user_recommendation, user_analytics)
 
 

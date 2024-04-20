@@ -2,19 +2,24 @@ import sys
 
 sys.path.insert(0, "/home/ubuntu/app/")
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from airflow.decorators import dag, task
 from dotenv import load_dotenv
 
-from database.MongoDBClient import *
-from processing.scraping.ScrapingMovies import *
-from processing.scraping.ScrapingUserReviews import *
+from database.MongoDBClient import MongoDBClient
+from processing.scraping.ScrapingMovies import ScrapingMovies
+from processing.scraping.ScrapingUserReviews import ScrapingUserReviews
 
 load_dotenv()
 
-default_args = {'owner': 'DijkstraFTW', 'start_date': datetime.datetime(2024, 1, 1), 'depends_on_past': False,
-                'retries': 1, 'retry_delay': timedelta(minutes=5)}
+default_args = {
+    'owner': 'DijkstraFTW',
+    'start_date': datetime(2024, 1, 1),
+    'depends_on_past': False,
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5)
+}
 
 
 @dag('letterboxd_bulk_scraping_dag', default_args=default_args, schedule='0 3 1 * *', catchup=False,

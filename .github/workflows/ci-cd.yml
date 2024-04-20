@@ -25,11 +25,13 @@ jobs:
     - name: Lint with Flake8
       run: |
         pip install flake8
-#        flake8 --ignore E501 dags --benchmark -v
-    - name: Confirm Black code compliance (psf/black)
-      run: |
-        pip install pytest-black
-#        pytest dags --black -v
+        flake8 --ignore=E402 --max-line-length=120  dags --benchmark -v
+        flake8 --max-line-length=120  database --benchmark -v
+        flake8 --max-line-length=120  messaging --benchmark -v
+#        TODO: other prediction files
+        flake8 --ignore=W504 --max-line-length=120  prediction/CollaborativeFilteringModel.py --benchmark -v
+        flake8 --ignore=E722 --max-line-length=120  processing --benchmark -v
+        flake8 --max-line-length=120  test --benchmark -v
     - name: Test with Pytest
       run: |
         pip install pytest

@@ -39,6 +39,7 @@ def create_bag_of_words(x):
     return "".join(
         [overview, " ", movie_type, " ", genres, " ", production_countries, " ", spoken_languages, " ", runtime])
 
+
 def select_last_model(directory):
     """
     Selects the most recent collaborative filtering model
@@ -57,10 +58,10 @@ def select_last_model(directory):
     latest_model = max(list_of_files, key=lambda x: datetime.strptime(x.split('_')[-1].split('.')[0], "%Y%m%d%H%M%S"))
     return os.path.join(directory, latest_model)
 
+
 def val2stars(index):
     """
     Converts a numerical value to a star rating
     :return: str : the star rating
     """
-
     return f"{index * 2}"

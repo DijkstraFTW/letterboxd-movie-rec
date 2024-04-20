@@ -149,7 +149,6 @@ class ScrapingMovies:
         try:
             for i in range(len(sections)):
                 theme = sections[i].find('h2').find('a').find('span', attrs={'class': 'label'}).text
-                print(theme)
                 themes.append(theme)
         except:
             themes = []
@@ -171,7 +170,6 @@ class ScrapingMovies:
         try:
             for i in range(len(sections)):
                 nanogenre = sections[i].find('h2').find('a').find('span', attrs={'class': 'label'}).text
-                print(nanogenre)
                 nanogenres.append(nanogenre)
         except:
             nanogenres = []
@@ -215,6 +213,7 @@ class ScrapingMovies:
         :return: list : list of dictionaries containing rated movies data from letterboxd
         """
         result = []
+        print("Getting {} rated movies".format(len(self.movies_list)))
         for movie in self.movies_list:
             movie_data = self.get_letterboxd_movies(self.movies_url.format(movie), movie)
             result.append(movie_data)

@@ -14,16 +14,48 @@ class UserAnalytics:
         """
         Sets the user history reviews table in duckdb
         """
-        self.conn.execute(
-            "CREATE TABLE reviews (movie_title VARCHAR, rating_date DATE, rating_val INTEGER, user_id VARCHAR, is_rewatch BOOLEAN, is_review BOOLEAN, is_liked BOOLEAN)")
+        self.conn.execute("""
+        CREATE TABLE reviews(
+        movie_title VARCHAR,
+        rating_date DATE,
+        rating_val INTEGER,
+        user_id VARCHAR,
+        is_rewatch BOOLEAN,
+        is_review BOOLEAN,
+        is_liked BOOLEAN
+        )
+        """)
         self.conn.register('reviews', self.user_reviews)
 
     def set_user_history_movies(self):
         """
         Sets the user history movies table in duckdb
         """
-        self.conn.execute(
-            """CREATE TABLE movies (movie_title_formatted VARCHAR,movie_title VARCHAR,type VARCHAR,year_released INTEGER,imdb_link VARCHAR,tmdb_link VARCHAR,imdb_id VARCHAR,tmdb_id VARCHAR,poster_url VARCHAR,genres VARCHAR,production_countries VARCHAR,spoken_languages VARCHAR,popularity FLOAT,overview VARCHAR,runtime INTEGER,vote_average FLOAT,vote_count INTEGER,release_date DATE,original_language VARCHAR,last_updated TIMESTAMP,themes VARCHAR,nanogenres VARCHAR)""")
+        self.conn.execute("""
+        CREATE TABLE movies (
+        movie_title_formatted VARCHAR,
+        movie_title VARCHAR,type VARCHAR,
+        year_released INTEGER,
+        imdb_link VARCHAR,
+        tmdb_link VARCHAR,
+        imdb_id VARCHAR,
+        tmdb_id VARCHAR,
+        poster_url VARCHAR,
+        genres VARCHAR,
+        production_countries VARCHAR,
+        spoken_languages VARCHAR,
+        popularity FLOAT,
+        overview VARCHAR,
+        runtime INTEGER,
+        vote_average FLOAT,
+        vote_count INTEGER,
+        release_date DATE,
+        original_language VARCHAR,
+        last_updated TIMESTAMP,
+        themes VARCHAR,
+        nanogenres VARCHAR
+        )
+        """)
         self.conn.register('movies', self.user_movies)
 
     def get_basic_metrics(self):
@@ -39,7 +71,8 @@ class UserAnalytics:
             FROM (
                 SELECT TRIM(unnested_country) AS country
                 FROM (
-                    SELECT UNNEST(SPLIT(REPLACE(REPLACE(production_countries, '[', ''), ']', ''), ',')) AS unnested_country
+                    SELECT UNNEST(SPLIT(REPLACE(REPLACE(production_countries, '[', ''), ']', ''), ','))
+                    AS unnested_country
                     FROM movies
                 ) AS t
             ) AS countries
@@ -99,11 +132,15 @@ class UserAnalytics:
             SELECT
                 user_id,
                 rating_date,
-                CASE 
+                CASE
                     WHEN prev_date IS NULL OR DATEDIFF(
-                        'days', 
-                        CAST(SUBSTR(prev_date, 7, 4) || '-' || SUBSTR(prev_date, 4, 2) || '-' || SUBSTR(prev_date, 1, 2) AS DATE), 
-                        CAST(SUBSTR(rating_date, 7, 4) || '-' || SUBSTR(rating_date, 4, 2) || '-' || SUBSTR(rating_date, 1, 2) AS DATE)
+                        'days',
+                        CAST(SUBSTR(prev_date, 7, 4) || '-' ||
+                        SUBSTR(prev_date, 4, 2) || '-' ||
+                        SUBSTR(prev_date, 1, 2) AS DATE),
+                        CAST(SUBSTR(rating_date, 7, 4) || '-' ||
+                        SUBSTR(rating_date, 4, 2) || '-' ||
+                        SUBSTR(rating_date, 1, 2) AS DATE)
                     ) > 1 THEN 1
                     ELSE 0
                 END AS new_streak
@@ -283,7 +320,8 @@ class UserAnalytics:
             AVG(CAST(r.rating_val AS FLOAT)) AS average_rating
         FROM (
             SELECT
-                TRIM(UNNEST(SPLIT(REPLACE(REPLACE(m.production_countries, '[', ''), ']', ''), ','))) AS unnested_country,
+                TRIM(UNNEST(SPLIT(REPLACE(REPLACE(m.production_countries, '[', ''), ']', ''), ',')))
+                AS unnested_country,
                 m.movie_title_formatted
             FROM movies m
         ) AS countries

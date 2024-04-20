@@ -54,7 +54,8 @@ class ScrapingUserReviews:
 
         user_id = str(uuid.uuid4())
         display_name = page.find("span", attrs={"class": "displayname tooltip"}).text.strip()
-        num_reviews = page.find("h4", attrs={"class": "profile-statistic statistic"}).find("span", attrs={"class": "value"}).text
+        num_reviews = (page.find("h4", attrs={"class": "profile-statistic statistic"})
+                       .find("span", attrs={"class": "value"}).text)
         user = {"user_id": user_id, "username": username, "display_name": display_name,
                 "num_reviews": num_reviews}
 
@@ -124,11 +125,12 @@ class ScrapingUserReviews:
             movie_title = review.find("div", attrs={"class", "film-poster"})["data-film-slug"]
 
             try:
-                rating_val = review.find('td', class_='td-rating rating-green').find('span')['class'][-1].split("rated-")[-1]
+                rating_element = review.find('td', class_='td-rating rating-green')
+                rating_val = rating_element.find('span')['class'][-1].split("rated-")[-1]
             except:
                 rating_val = 0
 
-            try :
+            try:
                 rewatch_element = review.find('td', class_='td-rewatch center').find("span")
                 is_rewatch = rewatch_element.has_attr('class') and 'icon-rewatch' in rewatch_element['class']
 
@@ -137,12 +139,13 @@ class ScrapingUserReviews:
 
             try:
                 review_element = review.find('td', class_='td-review center').find("a")
-                is_reviewed = True
+                is_reviewed = True or review_element is not None
 
             except:
                 is_reviewed = False
 
-            rating_object = {"movie_title": movie_title, "rating_date": date, "rating_val": rating_val, "user_id": user_id, "is_rewatch" : is_rewatch, "is_review" : is_reviewed}
+            rating_object = {"movie_title": movie_title, "rating_date": date, "rating_val": rating_val,
+                             "user_id": user_id, "is_rewatch": is_rewatch, "is_review": is_reviewed}
             ratings.append(rating_object)
 
         return ratings
@@ -164,8 +167,10 @@ class ScrapingUserReviews:
             reviews = response.findAll("li", attrs={"class": "poster-container"})
             for review in reviews:
                 try:
-                    like_element = review.find('p', class_='poster-viewingdata').find("span", class_='like liked-micro has-icon icon-liked icon-16').find('span')
-                    is_liked = True
+                    like_element = (review.find('p', class_='poster-viewingdata')
+                                    .find("span", class_='like liked-micro has-icon icon-liked icon-16')
+                                    .find('span'))
+                    is_liked = True or like_element is not None
 
                 except:
                     is_liked = False

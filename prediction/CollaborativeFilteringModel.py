@@ -28,7 +28,7 @@ class CollaborativeFilteringModel:
         self.df_ratings['user_id_int'] = self.df_ratings['user_id'].map(user_id_to_int)
         self.df_ratings['movie_id_int'] = self.df_ratings['movie_title'].map(movie_id_to_int)
 
-        print(f"Ratings data successfully preprocessed !")
+        print("Ratings data successfully preprocessed !")
 
         # Splitting the ratings data for training and testing
         train_df, test_df = train_test_split(self.df_ratings, test_size=0.25, random_state=42)
@@ -39,7 +39,7 @@ class CollaborativeFilteringModel:
         trainset = train_data.build_full_trainset()
         testset = test_data.build_full_trainset().build_testset()
 
-        print(f"Training and Testing sets successfully loaded !")
+        print("Training and Testing sets successfully loaded !")
 
         return trainset, testset
 
@@ -120,8 +120,9 @@ class CollaborativeFilteringModel:
         p90_votes = self.df_movies['vote_count'].quantile(0.9)
         avg_rating_mean = avg_rating.mean()
 
-        self.df_movies['weighted_average'] = (avg_rating * vote_count + p90_votes * avg_rating_mean) / (
-                vote_count + avg_rating_mean)
+        self.df_movies['weighted_average'] = (
+            (avg_rating * vote_count + p90_votes * avg_rating_mean) / (vote_count + avg_rating_mean)
+        )
 
         # Calculating the time decay factor of every movie
         current_year = datetime.now().year
@@ -136,8 +137,10 @@ class CollaborativeFilteringModel:
 
         # Calculating a custom 'score' based on a weighted combination of factors
         df_movies_factors['score'] = (
-                df_movies_factors['weighted_average'] * 0.5 + df_movies_factors['popularity'] * 0.45 +
-                df_movies_factors['time_decay_factor'] * 0.05)
+            df_movies_factors['weighted_average'] * 0.5 +
+            df_movies_factors['popularity'] * 0.45 +
+            df_movies_factors['time_decay_factor'] * 0.05
+        )
 
         # Sorting and returning the top $recs_numbers
         df_movies_factors_sorted = df_movies_factors.sort_values(by='score', ascending=False)
