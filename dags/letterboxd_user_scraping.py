@@ -1,6 +1,8 @@
 import sys
 import uuid
 
+from airflow.models import DagRun
+
 sys.path.insert(0, "/home/ubuntu/app/")
 
 from datetime import datetime, timedelta
@@ -33,12 +35,13 @@ default_args = {
 def letterboxd_user_recommendation():
     # Setting up the context
     @task(multiple_outputs=True, provide_context=True)
-    def setup_context(req_param: dict):
-        print(req_param)
-        if req_param and req_param.conf:
-            username = req_param.conf['username']
-            type = req_param.conf['type']
-            data_opt_out = req_param.conf['data_opt_out']
+    def setup_context():
+        dag_run = DagRun.get_current(context=True)
+        print(dag_run)
+        if dag_run and dag_run.conf:
+            username = dag_run.conf['username']
+            type = dag_run.conf['type']
+            data_opt_out = dag_run.conf['data_opt_out']
         else:
             username = 'default_username'
             type = 'default_type'
@@ -144,8 +147,7 @@ def letterboxd_user_recommendation():
         redis_client = RedisClient()
         redis_client.publish_recs_analytics(username, user_recommendation, user_analytics)
 
-    params = '{{ dag_run }}'
-    context_output = setup_context(params)
+    context_output = setup_context()
     print(context_output["username"], context_output["data_opt_out"], context_output["type"])
     reviews_output = scraping_user_reviews(context_output["username"], context_output["data_opt_out"])
     user_movies_shows = scraping_user_movies_shows(reviews_output["user_reviews"])
