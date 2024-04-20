@@ -32,11 +32,11 @@ default_args = {
                  'stored users watch history.')
 def letterboxd_user_recommendation(**kwargs):
     # Setting up the context
-    @task()
+    @task(multiple_outputs=True)
     def setup_context():
         dag_run = kwargs.get('dag_run', None)
+        print(dag_run)
         if dag_run and dag_run.conf:
-            print(dag_run.conf)
             username = dag_run.conf.get('username', 'default_username')
             type = dag_run.conf.get('type', 'default_type')
             data_opt_out = dag_run.conf.get('data_opt_out', False)
@@ -46,10 +46,10 @@ def letterboxd_user_recommendation(**kwargs):
             data_opt_out = False
 
         print(f"Username: {username}, Type: {type}, Data Opt Out: {data_opt_out}")
-        return username, type, data_opt_out
+        return dict(username=username, type=type, data_opt_out=data_opt_out)
 
     # Scraping the user's reviews
-    @task()
+    @task(multiple_outputs=True)
     def scraping_user_reviews(username: str, data_opt_out: bool):
 
         # check if user exists already
@@ -76,7 +76,7 @@ def letterboxd_user_recommendation(**kwargs):
             user_reviews = mongodb.get_reviews_by_user_id(client, user_id)
 
         mongodb.close_conn_to_db(client)
-        return user_reviews, user_id
+        return dict(user_reviews=user_reviews, user_id=user_id)
 
     # Scraping the user's movies and shows
     @task
