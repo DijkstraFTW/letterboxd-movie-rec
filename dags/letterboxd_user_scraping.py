@@ -57,10 +57,11 @@ def letterboxd_user_recommendation():
         # check if user exists already
         mongodb = MongoDBClient()
         client = mongodb.open_conn_to_db()
-        user_found = mongodb.find_user(client, username)
+        user_found = mongodb.find_user(client, username) == 1
+        print(f"User found: {user_found}")
 
         # user doesn't exist
-        if user_found <= 0:
+        if user_found:
             scraping_user_reviews = ScrapingUserReviews()
             user_id = str(uuid.uuid4())
             user = scraping_user_reviews.get_user(username)
