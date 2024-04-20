@@ -98,17 +98,21 @@ class MongoDBClient:
             return result
         except Exception as e:
             print("Error reading all users from MongoDB: " + str(e))
-            return []
+            return None
 
     def get_user_custom_id(self, client, username):
         query = {"username": username}
         try:
             collection = client[str(self.database)].users
-            result = collection.find(query).get('user_id')
-            return result
+            result = collection.find_one(query)
+            if result:
+                return result.get('user_id')
+            else:
+                print("No user found with username:", username)
+                return None
         except Exception as e:
             print("Error getting user_id from MongoDB: " + str(e))
-            return []
+            return None
 
     def get_reviews_by_user_id(self, client, user_id):
         query = {"user_id": user_id}
