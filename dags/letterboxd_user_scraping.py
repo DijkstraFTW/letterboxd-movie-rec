@@ -33,12 +33,12 @@ default_args = {
 def letterboxd_user_recommendation():
     # Setting up the context
     @task(multiple_outputs=True, provide_context=True)
-    def setup_context(dag: dict):
-        print(dag)
-        if dag and dag.conf:
-            username = dag.conf['username']
-            type = dag.conf['type']
-            data_opt_out = dag.conf['data_opt_out']
+    def setup_context(req_param: dict):
+        print(req_param)
+        if req_param and req_param.conf:
+            username = req_param.conf['username']
+            type = req_param.conf['type']
+            data_opt_out = req_param.conf['data_opt_out']
         else:
             username = 'default_username'
             type = 'default_type'
@@ -145,7 +145,6 @@ def letterboxd_user_recommendation():
         redis_client.publish_recs_analytics(username, user_recommendation, user_analytics)
 
     params = '{{ dag_run }}'
-    print(params)
     context_output = setup_context(params)
     print(context_output["username"], context_output["data_opt_out"], context_output["type"])
     reviews_output = scraping_user_reviews(context_output["username"], context_output["data_opt_out"])
