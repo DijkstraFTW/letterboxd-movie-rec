@@ -202,7 +202,7 @@ class ScrapingUserReviews:
             rating = self.get_ratings_data(response, user_id, return_unrated=return_unrated)
             ratings.extend(rating)
 
-        return combined_rating
+        return ratings
 
     def get_all_ratings(self, username, data_opt_out=False):
         """
