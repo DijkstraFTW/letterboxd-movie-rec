@@ -94,7 +94,7 @@ class MongoDBClient:
         query = {"username": username}
         try:
             collection = client[str(self.database)].users
-            result = collection.find(query).count()
+            result = collection.count_documents(query)
             return result
         except Exception as e:
             print("Error reading all users from MongoDB: " + str(e))
