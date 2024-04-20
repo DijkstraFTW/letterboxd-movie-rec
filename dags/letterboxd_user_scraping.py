@@ -33,12 +33,12 @@ default_args = {
 def letterboxd_user_recommendation():
     # Setting up the context
     @task(multiple_outputs=True, provide_context=True)
-    def setup_context(dag_run: dict):
-        print(dag_run)
-        if dag_run and dag_run.conf:
-            username = dag_run.conf['username']
-            type = dag_run.conf['type']
-            data_opt_out = dag_run.conf['data_opt_out']
+    def setup_context(dag: dict):
+        print(dag)
+        if dag and dag.conf:
+            username = dag.conf['username']
+            type = dag.conf['type']
+            data_opt_out = dag.conf['data_opt_out']
         else:
             username = 'default_username'
             type = 'default_type'
