@@ -44,6 +44,7 @@ def letterboxd_user_recommendation(**kwargs):
             type = 'default_type'
             data_opt_out = False
 
+        print(f"Username: {username}, Type: {type}, Data Opt Out: {data_opt_out}")
         return username, type, data_opt_out
 
     # Scraping the user's reviews
@@ -144,6 +145,7 @@ def letterboxd_user_recommendation(**kwargs):
         redis_client.publish_recs_analytics(username, user_recommendation, user_analytics)
 
     context_output = setup_context()
+    print(context_output["username"], context_output["data_opt_out"], context_output["type"])
     reviews_output = scraping_user_reviews(context_output["username"], context_output["data_opt_out"])
     user_movies_shows = scraping_user_movies_shows(reviews_output["user_reviews"])
     user_recommendation = get_user_recommendations(reviews_output["user_reviews"], reviews_output["user_id"],
