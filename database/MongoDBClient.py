@@ -56,12 +56,12 @@ class MongoDBClient:
         try:
             collection = client[str(self.database)].movies
             collection.insert_one(movie)
-            print("Successfully added movie data to MongoDB instance!")
+            print("Successfully added {} movie data to MongoDB instance!".format(movie["movie_title_formatted"]))
         except Exception as e:
             print(
                 "Error adding {} : {} movie to MongoDB : " + str(e).format(movie["movie_title"], movie["release_date"]))
 
-    def read_all_movies(self, client):
+    def read_all_movies_title_formatted(self, client):
         try:
             collection = client[str(self.database)].movies
             result = collection.find()

@@ -48,7 +48,7 @@ class DataLoader:
         movies_list = []
         mongodb = MongoDBClient()
         client = mongodb.open_conn_to_db()
-        movies = client.read_all_movies
+        movies = client.read_all_movies_title_formatted
 
         for i in movies:
             movies_list.append({"movie_title_formatted": i["movie_title_formatted"], "movie_title": i["movie_title"],

@@ -56,14 +56,12 @@ def letterboxd_user_recommendation():
         mongodb = MongoDBClient()
         client = mongodb.open_conn_to_db()
         user_found = mongodb.find_user(client, username) == 1
-        print(f"Username: {username}, Data Opt Out: {data_opt_out}")
 
         # user doesn't exist
         if not user_found:
             scraping_user_reviews = ScrapingUserReviews()
             user_id = str(uuid.uuid4())
             ratings = scraping_user_reviews.get_user_ratings(username, user_id, data_opt_out)
-            print(ratings)
 
             if not data_opt_out:
                 user = scraping_user_reviews.get_user(username)
@@ -87,7 +85,7 @@ def letterboxd_user_recommendation():
         mongodb = MongoDBClient()
         client = mongodb.open_conn_to_db()
 
-        movies_scraped_set = set(mongodb.read_all_movies(client))
+        movies_scraped_set = set(mongodb.read_all_movies_title_formatted(client))
         user_movies = set([item["movie_title"] for item in user_reviews])
         new_movies_list = list(movies_scraped_set.difference(user_movies))
 
@@ -114,7 +112,7 @@ def letterboxd_user_recommendation():
         mongodb = MongoDBClient()
         client = mongodb.open_conn_to_db()
         reviews = mongodb.read_all_ratings(client)
-        movies = mongodb.read_all_movies(client)
+        movies = mongodb.read_all_movies_title_formatted(client)
         reviews = user_reviews + reviews
 
         collaborative_filtering = CollaborativeFilteringModel(reviews, movies)
