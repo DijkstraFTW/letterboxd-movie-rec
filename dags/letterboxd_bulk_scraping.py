@@ -49,7 +49,7 @@ def letterboxd_bulk_scraping():
 
         movies_list = mongodb.read_all_rated_movies(client)
         existing_movies_set = set(mongodb.read_all_movies_title_formatted(client))
-        updated_movies_set = set([item["movie_title"] for item in movies_list])
+        updated_movies_set = set(movies_list)
         movies_to_scrap_list = list(existing_movies_set.difference(updated_movies_set))
 
         scraping_movies = ScrapingMovies(movies_to_scrap_list)
