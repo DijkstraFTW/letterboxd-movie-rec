@@ -28,7 +28,7 @@ class UserAnalytics:
         user_id VARCHAR,
         is_rewatch BOOLEAN,
         is_review BOOLEAN
-        )
+        );
         """)
         self.conn.register('reviews', self.user_reviews)
 
@@ -62,7 +62,7 @@ class UserAnalytics:
         last_updated TIMESTAMP,
         themes VARCHAR,
         nanogenres VARCHAR
-        )
+        );
         """)
         self.conn.register('movies', self.user_movies)
 
