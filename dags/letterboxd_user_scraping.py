@@ -85,9 +85,12 @@ def letterboxd_user_recommendation():
         mongodb = MongoDBClient()
         client = mongodb.open_conn_to_db()
 
+        user_movies = [item["movie_title"] for item in user_reviews]
         movies_scraped_set = set(mongodb.read_all_movies_title_formatted(client))
-        user_movies = set([item["movie_title"] for item in user_reviews])
-        new_movies_list = list(movies_scraped_set.difference(user_movies))
+        user_movies_set = set(user_movies)
+        new_movies_list = list(movies_scraped_set.difference(user_movies_set))
+
+        print("Adding {} movies to database".format(len(new_movies_list)))
 
         scraping_movies = ScrapingMovies(new_movies_list)
         new_movies = scraping_movies.get_rated_movies()
@@ -146,7 +149,6 @@ def letterboxd_user_recommendation():
         redis_client.publish_recs_analytics(username, user_recommendation, user_analytics)
 
     context_output = setup_context()
-    print(context_output["username"], context_output["data_opt_out"], context_output["type"])
     reviews_output = scraping_user_reviews(context_output["username"], context_output["data_opt_out"])
     user_movies_shows = scraping_user_movies_shows(reviews_output["user_reviews"])
     user_recommendation = get_user_recommendations(reviews_output["user_reviews"], reviews_output["user_id"],
