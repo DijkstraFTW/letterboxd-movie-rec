@@ -52,14 +52,8 @@ class CollaborativeFilteringModel:
         :rtype: str: returns the saved model path
         """
 
-        # Model parameters
-        n_factors = 150
-        n_epochs = 5
-        lr_all = 0.012
-        reg_all = 0.15
-
         # Training the SVD model
-        algo = SVD(n_factors=n_factors, n_epochs=n_epochs, lr_all=lr_all, reg_all=reg_all)
+        algo = SVD(random_state=0, n_factors=200, n_epochs=30)
         algo.fit(train_set)
 
         # Training metrics
@@ -81,7 +75,6 @@ class CollaborativeFilteringModel:
         :rtype: float: returns the predicted rating
         """
         prediction = self.model.predict(user_id, movie_id)
-        print(prediction)
         return prediction.est
 
     def generate_recommendation(self, user_id, number_of_recommendations=10):
