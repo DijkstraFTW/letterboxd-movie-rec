@@ -5,7 +5,6 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from surprise import (Reader, Dataset, SVD, accuracy)
-from surprise.model_selection import GridSearchCV
 
 
 class CollaborativeFilteringModel:
@@ -14,6 +13,7 @@ class CollaborativeFilteringModel:
         self.model = None
         self.df_ratings = pd.DataFrame(ratings)
         self.df_movies = pd.DataFrame(movies)
+        self.user_id_int = 0
 
     def prepare_dataset(self):
         """
@@ -67,7 +67,7 @@ class CollaborativeFilteringModel:
         # Saving the model
         self.model = algo
 
-    def predict_rating_movie_user(self, user_id, movie_id):
+    def predict_rating_movie_user(self, movie_id):
         """
         Predicts the rating of a movie for a given user.
 
@@ -75,7 +75,7 @@ class CollaborativeFilteringModel:
         :param movie_id: the movie id
         :rtype: float: returns the predicted rating
         """
-        prediction = self.model.predict(user_id, movie_id)
+        prediction = self.model.predict(self.user_id_int, movie_id)
         return prediction.est
 
     def generate_recommendation(self, user_id, number_of_recommendations=10):
@@ -87,16 +87,16 @@ class CollaborativeFilteringModel:
         :rtype: returns a list of recommended item IDs along with predicted ratings.
         """
         # Getting the unrated items for the user
-        rated_items = self.df_ratings[self.df_ratings['user_id_int'] == user_id]['movie_id_int'].unique()
+        rated_items = self.df_ratings[self.df_ratings['user_id'] == user_id]['movie_id_int'].unique()
         all_items = self.df_ratings['movie_id_int'].unique()
         unrated_items = [item for item in all_items if item not in rated_items]
 
         # Predicting the ratings for the unrated items
-        predictions = [self.predict_rating_movie_user(user_id, item) for item in unrated_items]
+        predictions = [self.predict_rating_movie_user(item) for item in unrated_items]
         item_predictions = list(zip(unrated_items, predictions))
 
         # Sorting the predictions and returning the top N recommendations
-        item_predictions.sort(key=lambda x: x[2], reverse=True)
+        item_predictions.sort(key=lambda x: x[1], reverse=True)
         top_n_recommendations = item_predictions[:number_of_recommendations]
         top_n_recommendations = [(self.df_ratings["movie_title"][item], item, rating) for item, rating in
                                  top_n_recommendations]

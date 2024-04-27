@@ -27,8 +27,7 @@ class UserAnalytics:
         rating_val INTEGER,
         user_id VARCHAR,
         is_rewatch BOOLEAN,
-        is_review BOOLEAN,
-        is_liked BOOLEAN
+        is_review BOOLEAN
         )
         """)
         self.conn.register('reviews', self.user_reviews)
@@ -47,6 +46,8 @@ class UserAnalytics:
         tmdb_link VARCHAR,
         imdb_id VARCHAR,
         tmdb_id VARCHAR,
+        lb_rating DECIMAL(2, 1),
+        histogram VARCHAR,
         poster_url VARCHAR,
         genres VARCHAR,
         production_countries VARCHAR,
