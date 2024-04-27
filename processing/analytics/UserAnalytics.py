@@ -71,9 +71,23 @@ class UserAnalytics:
         Returns basic metrics about the user's reviews and movies history
         :return: dictionary : dictionary with basic metrics
         """
-        movies_reviewed = self.conn.execute("SELECT COUNT(*) FROM movies WHERE type = 'movie'").fetchone()[0]
-        shows_reviewed = self.conn.execute("SELECT COUNT(*) FROM movies WHERE type = 'shows'").fetchone()[0]
-        hours_watched = self.conn.execute("SELECT SUM(runtime) FROM movies").fetchone()[0]
+        movies_reviewed = self.conn.execute("""
+        SELECT COUNT(*) 
+        FROM movies 
+        WHERE type = 'movie';
+        """).fetchone()[0]
+
+        shows_reviewed = self.conn.execute("""
+        SELECT COUNT(*) 
+        FROM movies 
+        WHERE type = 'shows';
+        """).fetchone()[0]
+
+        hours_watched = self.conn.execute("""
+        SELECT SUM(runtime) 
+        FROM movies;
+        """).fetchone()[0]
+
         most_common_countries = self.conn.execute("""
             SELECT country, COUNT(*) AS count
             FROM (
