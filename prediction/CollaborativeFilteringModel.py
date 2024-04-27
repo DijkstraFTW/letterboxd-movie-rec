@@ -1,4 +1,3 @@
-import pickle
 from datetime import datetime
 
 import numpy as np
@@ -11,7 +10,7 @@ from surprise import (Reader, Dataset, SVD, SVDpp, accuracy)
 class CollaborativeFilteringModel:
 
     def __init__(self, ratings, movies):
-        self.model = pickle.load(open("/models/model.pkl", "rb"))
+        self.model = None
         self.df_ratings = pd.DataFrame(ratings)
         self.df_movies = pd.DataFrame(movies)
 
