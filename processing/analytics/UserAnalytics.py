@@ -36,7 +36,7 @@ class UserAnalytics:
         CREATE TABLE movies (
         movie_title_formatted VARCHAR,
         movie_title VARCHAR,
-        type VARCHAR,
+        media_type VARCHAR,
         year_released INTEGER,
         imdb_link VARCHAR,
         tmdb_link VARCHAR,
@@ -70,13 +70,13 @@ class UserAnalytics:
         movies_reviewed = self.conn.execute("""
         SELECT COUNT(*) 
         FROM movies 
-        WHERE type = 'movie';
+        WHERE media_type = 'movie';
         """).fetchone()[0]
 
         shows_reviewed = self.conn.execute("""
         SELECT COUNT(*) 
         FROM movies 
-        WHERE type = 'shows';
+        WHERE media_type = 'shows';
         """).fetchone()[0]
 
         hours_watched = self.conn.execute("""
