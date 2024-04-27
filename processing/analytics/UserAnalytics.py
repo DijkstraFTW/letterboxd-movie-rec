@@ -9,6 +9,8 @@ class UserAnalytics:
     def __init__(self, db_path, reviews, movies):
         if os.path.exists(db_path):
             os.remove(db_path)
+        if os.path.exists(str(db_path) + ".wal"):
+            os.remove(str(db_path) + ".wal")
         self.conn = duckdb.connect(db_path)
         self.cur = self.conn.cursor()
         self.user_reviews = pd.DataFrame(reviews)

@@ -136,7 +136,7 @@ def letterboxd_user_recommendation():
     def get_user_analytics(username: str, user_reviews: list, user_movies: list, type: str):
 
         if type == "letterboxd":
-            user_analytics = UserAnalytics(username, user_reviews, user_movies)
+            user_analytics = UserAnalytics("/users_cache/" + str(username), user_reviews, user_movies)
             user_analytics.set_user_history_movies()
             user_analytics.set_user_history_reviews()
             user_analytics_data = user_analytics.get_basic_metrics()

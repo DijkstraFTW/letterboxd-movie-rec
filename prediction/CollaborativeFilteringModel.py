@@ -1,16 +1,17 @@
+import pickle
 from datetime import datetime
 
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-from surprise import (Reader, Dataset, SVDpp, accuracy)
+from surprise import (Reader, Dataset, SVD, SVDpp, accuracy)
 
 
 class CollaborativeFilteringModel:
 
     def __init__(self, ratings, movies):
-        self.model = None
+        self.model = pickle.load(open("/models/model.pkl", "rb"))
         self.df_ratings = pd.DataFrame(ratings)
         self.df_movies = pd.DataFrame(movies)
 
@@ -45,21 +46,15 @@ class CollaborativeFilteringModel:
 
     def train_model(self, train_set, test_set):
         """
-        Fits an SVDpp collaborative filtering model using the user ratings
+        Fits an SVDpp collaborative filtering model using the users ratings
 
         :param train_set: the training set
         :param test_set: the testing set
         :rtype: str: returns the saved model path
         """
 
-        # Model parameters
-        n_factors = 150
-        n_epochs = 1
-        lr_all = 0.012
-        reg_all = 0.15
-
         # Training the SVDpp model
-        algo = SVDpp()
+        algo = SVD()
         algo.fit(train_set)
 
         # Training metrics
