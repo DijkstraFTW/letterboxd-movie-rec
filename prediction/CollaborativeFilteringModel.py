@@ -31,7 +31,7 @@ class CollaborativeFilteringModel:
         print("Ratings data successfully preprocessed !")
 
         # Splitting the ratings data for training and testing
-        train_df, test_df = train_test_split(self.df_ratings, test_size=0.25, random_state=42)
+        train_df, test_df = train_test_split(self.df_ratings, test_size=0.12, random_state=42)
         reader = Reader(rating_scale=(1, 10))
         train_data = Dataset.load_from_df(train_df[["user_id_int", "rating_val", "movie_id_int"]], reader)
         test_data = Dataset.load_from_df(test_df[["user_id_int", "rating_val", "movie_id_int"]], reader)
@@ -81,6 +81,7 @@ class CollaborativeFilteringModel:
         :rtype: float: returns the predicted rating
         """
         prediction = self.model.predict(user_id, movie_id)
+        print(prediction)
         return prediction.est
 
     def generate_recommendation(self, user_id, number_of_recommendations=10):
@@ -100,11 +101,11 @@ class CollaborativeFilteringModel:
         predictions = [self.predict_rating_movie_user(user_id, item) for item in unrated_items]
         item_predictions = list(zip(unrated_items, predictions))
 
-        print(item_predictions)
-
         # Sorting the predictions and returning the top N recommendations
         item_predictions.sort(key=lambda x: x[1], reverse=True)
         top_n_recommendations = item_predictions[:number_of_recommendations]
+        top_n_recommendations = [(self.df_ratings["movie_title"][item], item, rating) for item, rating in
+                                 top_n_recommendations]
 
         return top_n_recommendations
 
