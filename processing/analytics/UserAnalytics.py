@@ -67,6 +67,9 @@ class UserAnalytics:
         Returns basic metrics about the user's reviews and movies history
         :return: dictionary : dictionary with basic metrics
         """
+
+        print(self.conn.execute("SELECT COUNT(*) FROM movies LIMIT 1").fetchdf())
+
         movies_reviewed = self.conn.execute("""
         SELECT COUNT(*) 
         FROM movies 
