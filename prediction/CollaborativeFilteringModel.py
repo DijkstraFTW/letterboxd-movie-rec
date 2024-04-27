@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-from surprise import (Reader, Dataset, SVD, SVDpp, accuracy)
+from surprise import (Reader, Dataset, SVD, GridSearchCV, accuracy)
 
 
 class CollaborativeFilteringModel:
@@ -52,8 +52,18 @@ class CollaborativeFilteringModel:
         :rtype: str: returns the saved model path
         """
 
+        param_grid = {'n_factors': [5, 10, 20], 'n_epochs': [20, 30, 50], 'lr_all': [0.002, 0.005, 0.01],
+                      'reg_all': [0.02, 0.05, 0.1]}
+
+        # Tune algorithm parameters with GridSearchCV and k=4 cross-validation
+        gs = GridSearchCV(SVD, param_grid, measures=['rmse'], cv=4)
+        gs.fit(train_set)
+
+        print(gs.best_params['rmse'])
+
         # Training the SVD model
-        algo = SVD(random_state=0, n_factors=200, n_epochs=30)
+        algo = SVD(n_factors=gs.best_params['rmse']["n_factors"], n_epochs=gs.best_params['rmse']["n_epochs"],
+                   lr_all=gs.best_params['rmse']["lr_all"], reg_all=gs.best_params['rmse']["reg_all"])
         algo.fit(train_set)
 
         # Training metrics
@@ -117,8 +127,7 @@ class CollaborativeFilteringModel:
         avg_rating_mean = avg_rating.mean()
 
         self.df_movies['weighted_average'] = (
-            (avg_rating * vote_count + p90_votes * avg_rating_mean) / (vote_count + avg_rating_mean)
-        )
+                (avg_rating * vote_count + p90_votes * avg_rating_mean) / (vote_count + avg_rating_mean))
 
         # Calculating the time decay factor of every movie
         current_year = datetime.now().year
@@ -133,10 +142,8 @@ class CollaborativeFilteringModel:
 
         # Calculating a custom 'score' based on a weighted combination of factors
         df_movies_factors['score'] = (
-            df_movies_factors['weighted_average'] * 0.5 +
-            df_movies_factors['popularity'] * 0.45 +
-            df_movies_factors['time_decay_factor'] * 0.05
-        )
+                df_movies_factors['weighted_average'] * 0.5 + df_movies_factors['popularity'] * 0.45 +
+                df_movies_factors['time_decay_factor'] * 0.05)
 
         # Sorting and returning the top $recs_numbers
         df_movies_factors_sorted = df_movies_factors.sort_values(by='score', ascending=False)
