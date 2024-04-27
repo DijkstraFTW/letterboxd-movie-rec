@@ -53,18 +53,8 @@ class CollaborativeFilteringModel:
         :rtype: str: returns the saved model path
         """
 
-        param_grid = {'n_factors': [5, 10, 20], 'n_epochs': [20, 30, 50], 'lr_all': [0.002, 0.005, 0.01],
-                      'reg_all': [0.02, 0.05, 0.1]}
-
-        # Tune algorithm parameters with GridSearchCV and k=4 cross-validation
-        gs = GridSearchCV(SVD, param_grid, measures=['rmse'], cv=4)
-        gs.fit(train_set)
-
-        print(gs.best_params['rmse'])
-
         # Training the SVD model
-        algo = SVD(n_factors=gs.best_params['rmse']["n_factors"], n_epochs=gs.best_params['rmse']["n_epochs"],
-                   lr_all=gs.best_params['rmse']["lr_all"], reg_all=gs.best_params['rmse']["reg_all"])
+        algo = SVD(n_factors=20, n_epochs=50, lr_all=0.01, reg_all=0.1)
         algo.fit(train_set)
 
         # Training metrics
