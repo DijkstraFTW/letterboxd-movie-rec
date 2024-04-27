@@ -21,18 +21,6 @@ class UserAnalytics:
         Sets the user history reviews table in duckdb
         """
         self.conn.execute("""
-                CREATE TABLE reviews(
-                movie_title VARCHAR,
-                rating_date DATE,
-                rating_val INTEGER,
-                user_id VARCHAR,
-                is_rewatch BOOLEAN,
-                is_review BOOLEAN,
-                is_liked BOOLEAN
-                )
-                """)
-
-        self.conn.execute("""
         CREATE TABLE reviews(
         movie_title VARCHAR,
         rating_date DATE,

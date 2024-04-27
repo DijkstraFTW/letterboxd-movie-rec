@@ -94,6 +94,8 @@ class CollaborativeFilteringModel:
         predictions = [self.predict_rating_movie_user(user_id, item) for item in unrated_items]
         item_predictions = list(zip(unrated_items, predictions))
 
+        print(item_predictions)
+
         # Sorting the predictions and returning the top N recommendations
         item_predictions.sort(key=lambda x: x[1], reverse=True)
         top_n_recommendations = item_predictions[:number_of_recommendations]
