@@ -54,12 +54,12 @@ class CollaborativeFilteringModel:
 
         # Model parameters
         n_factors = 150
-        n_epochs = 5
+        n_epochs = 1
         lr_all = 0.012
         reg_all = 0.15
 
         # Training the SVDpp model
-        algo = SVDpp(n_factors=n_factors, n_epochs=n_epochs, lr_all=lr_all, reg_all=reg_all)
+        algo = SVDpp()
         algo.fit(train_set)
 
         # Training metrics

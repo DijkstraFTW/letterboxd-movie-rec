@@ -90,9 +90,9 @@ def letterboxd_user_recommendation():
         user_movies_set = set(user_movies)
         new_movies_list = list(user_movies_set.difference(movies_scraped_set))
 
-        print("Adding {} movies to database".format(len(new_movies_list)))
+        print("Adding {} movies to database !".format(len(new_movies_list)))
 
-        if len(new_movies_list) == 0:
+        if len(new_movies_list) != 0:
 
             scraping_movies = ScrapingMovies(new_movies_list)
             new_movies = scraping_movies.get_rated_movies()

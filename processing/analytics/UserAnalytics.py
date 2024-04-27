@@ -1,3 +1,5 @@
+import os
+
 import duckdb
 import pandas as pd
 
@@ -5,6 +7,8 @@ import pandas as pd
 class UserAnalytics:
 
     def __init__(self, db_path, reviews, movies):
+        if os.path.exists(db_path):
+            os.remove(db_path)
         self.conn = duckdb.connect(db_path)
         self.cur = self.conn.cursor()
         self.user_reviews = pd.DataFrame(reviews)
@@ -14,6 +18,18 @@ class UserAnalytics:
         """
         Sets the user history reviews table in duckdb
         """
+        self.conn.execute("""
+                CREATE TABLE reviews(
+                movie_title VARCHAR,
+                rating_date DATE,
+                rating_val INTEGER,
+                user_id VARCHAR,
+                is_rewatch BOOLEAN,
+                is_review BOOLEAN,
+                is_liked BOOLEAN
+                )
+                """)
+
         self.conn.execute("""
         CREATE TABLE reviews(
         movie_title VARCHAR,
