@@ -29,7 +29,7 @@ class CollaborativeFilteringModel:
         self.df_ratings['user_id_int'] = self.df_ratings['user_id'].map(user_id_to_int)
         self.df_ratings['movie_id_int'] = self.df_ratings['movie_title'].map(movie_id_to_int)
 
-        print("Ratings data successfully preprocessed !")
+        print("Ratings data successfully preprocessed : ", len(self.df_ratings))
 
         # Splitting the ratings data for training and testing
         train_df, test_df = train_test_split(self.df_ratings, test_size=0.12, random_state=42)
@@ -54,7 +54,7 @@ class CollaborativeFilteringModel:
         """
 
         # Training the SVD model
-        algo = SVD(n_factors=20, n_epochs=50, lr_all=0.01, reg_all=0.1)
+        algo = SVD(n_factors=200, n_epochs=200, lr_all=0.01, reg_all=0.1)
         algo.fit(train_set)
 
         # Training metrics
@@ -96,7 +96,7 @@ class CollaborativeFilteringModel:
         item_predictions = list(zip(unrated_items, predictions))
 
         # Sorting the predictions and returning the top N recommendations
-        item_predictions.sort(key=lambda x: x[1], reverse=True)
+        item_predictions.sort(key=lambda x: x[2], reverse=True)
         top_n_recommendations = item_predictions[:number_of_recommendations]
         top_n_recommendations = [(self.df_ratings["movie_title"][item], item, rating) for item, rating in
                                  top_n_recommendations]
