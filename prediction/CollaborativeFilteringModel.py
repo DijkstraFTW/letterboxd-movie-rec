@@ -4,7 +4,8 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-from surprise import (Reader, Dataset, SVD, GridSearchCV, accuracy)
+from surprise import (Reader, Dataset, SVD, accuracy)
+from surprise.model_selection import GridSearchCV
 
 
 class CollaborativeFilteringModel:

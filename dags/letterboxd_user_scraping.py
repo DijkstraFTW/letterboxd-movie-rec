@@ -118,9 +118,9 @@ def letterboxd_user_recommendation():
         client = mongodb.open_conn_to_db()
         reviews = mongodb.read_all_ratings(client)
         movies = mongodb.read_all_movies_title_formatted(client)
-        reviews = user_reviews + reviews
+        all_reviews = user_reviews + reviews
 
-        collaborative_filtering = CollaborativeFilteringModel(reviews, movies)
+        collaborative_filtering = CollaborativeFilteringModel(all_reviews, movies)
         trainset, testset = collaborative_filtering.prepare_dataset()
         collaborative_filtering.train_model(trainset, testset)
 
