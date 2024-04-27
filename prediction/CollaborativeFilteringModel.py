@@ -46,7 +46,7 @@ class CollaborativeFilteringModel:
 
     def train_model(self, train_set, test_set):
         """
-        Fits an SVDpp collaborative filtering model using the users ratings
+        Fits an SVD collaborative filtering model using the users ratings
 
         :param train_set: the training set
         :param test_set: the testing set
@@ -54,7 +54,7 @@ class CollaborativeFilteringModel:
         """
 
         # Training the SVD model
-        algo = SVD(n_factors=1000, n_epochs=50, lr_all=0.01, reg_all=0.1)
+        algo = SVD(n_factors=200, n_epochs=30, lr_all=0.01, reg_all=0.1)
         algo.fit(train_set)
 
         # Training metrics
