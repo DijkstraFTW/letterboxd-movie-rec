@@ -127,6 +127,8 @@ class ScrapingUserReviews:
             try:
                 rating_element = review.find('td', class_='td-rating rating-green')
                 rating_val = rating_element.find('span')['class'][-1].split("rated-")[-1]
+                if rating_val == "rating":
+                    rating_val = 0
             except:
                 rating_val = 0
 

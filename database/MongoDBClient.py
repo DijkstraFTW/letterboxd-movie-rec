@@ -46,8 +46,10 @@ class MongoDBClient:
     def read_all_ratings(self, client):
         try:
             collection = client[str(self.database)].ratings
-            result = collection.find()
-            return list(result)
+            result = list(collection.find())
+            # TODO: Remove this line once the data is clean
+            result = [item for item in result if item["rating_val"] != "rating"]
+            return result
         except Exception as e:
             print("Error reading all movies from MongoDB: " + str(e))
             return []
