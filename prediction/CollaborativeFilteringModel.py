@@ -54,7 +54,7 @@ class CollaborativeFilteringModel:
         """
 
         # Training the SVD model
-        algo = SVD(n_factors=200, n_epochs=30, lr_all=0.01, reg_all=0.1)
+        algo = SVD(n_factors=50, n_epochs=5, lr_all=0.01, reg_all=0.1)
         algo.fit(train_set)
 
         # Training metrics

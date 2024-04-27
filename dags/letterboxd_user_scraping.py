@@ -86,25 +86,25 @@ def letterboxd_user_recommendation():
         client = mongodb.open_conn_to_db()
 
         user_movies = [item["movie_title"] for item in user_reviews]
-        movies_scraped_set = set(mongodb.read_all_movies_title_formatted(client))
         user_movies_set = set(user_movies)
+        movies_scraped_set = set(mongodb.read_all_movies_title_formatted(client))
         new_movies_list = list(user_movies_set.difference(movies_scraped_set))
 
         print("Adding {} movies to database !".format(len(new_movies_list)))
 
-        if len(new_movies_list) != 0:
-
-            scraping_movies = ScrapingMovies(new_movies_list)
-            new_movies = scraping_movies.get_rated_movies()
-
-            for movie in new_movies:
-                posters = scraping_movies.get_movie_posters(movie)
-                themes = scraping_movies.get_movie_themes(movie)
-                nanogenres = scraping_movies.get_movie_nanogenres(movie)
-                themoviedb = scraping_movies.get_themoviedb_data(movie, movie["type"])
-                combined_movie_item = {**movie, **posters, **themes, **nanogenres, **themoviedb}
-                if combined_movie_item["type"] != "none":
-                    mongodb.insert_movies(client, combined_movie_item)
+        # if len(new_movies_list) != 0:
+        #
+        #     scraping_movies = ScrapingMovies(new_movies_list)
+        #     new_movies = scraping_movies.get_rated_movies()
+        #
+        #     for movie in new_movies:
+        #         posters = scraping_movies.get_movie_posters(movie)
+        #         themes = scraping_movies.get_movie_themes(movie)
+        #         nanogenres = scraping_movies.get_movie_nanogenres(movie)
+        #         themoviedb = scraping_movies.get_themoviedb_data(movie, movie["type"])
+        #         combined_movie_item = {**movie, **posters, **themes, **nanogenres, **themoviedb}
+        #         if combined_movie_item["type"] != "none":
+        #             mongodb.insert_movies(client, combined_movie_item)
 
         mongodb.close_conn_to_db(client)
         return user_movies
