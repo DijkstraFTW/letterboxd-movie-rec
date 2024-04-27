@@ -47,7 +47,7 @@ class MongoDBClient:
         try:
             collection = client[str(self.database)].ratings
             result = collection.find()
-            return result
+            return list(result)
         except Exception as e:
             print("Error reading all movies from MongoDB: " + str(e))
             return []
