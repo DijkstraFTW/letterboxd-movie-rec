@@ -54,7 +54,7 @@ class CollaborativeFilteringModel:
         """
 
         # Training the SVD model
-        algo = SVD(n_factors=50, n_epochs=200, lr_all=0.01, reg_all=0.1)
+        algo = SVD(n_factors=1000, n_epochs=50, lr_all=0.01, reg_all=0.1)
         algo.fit(train_set)
 
         # Training metrics
@@ -86,6 +86,7 @@ class CollaborativeFilteringModel:
         :rtype: returns a list of recommended item IDs along with predicted ratings.
         """
         # Getting the unrated items for the user
+        print(list(self.df_ratings[self.df_ratings['user_id_int'] == self.user_id_int]["movie_title"]))
         rated_items = self.df_ratings[self.df_ratings['user_id_int'] == self.user_id_int]['movie_id_int'].unique()
         all_items = self.df_ratings['movie_id_int'].unique()
         unrated_items = [item for item in all_items if item not in rated_items]
