@@ -40,7 +40,8 @@ class UserAnalytics:
         self.conn.execute("""
         CREATE TABLE movies (
         movie_title_formatted VARCHAR,
-        movie_title VARCHAR,type VARCHAR,
+        movie_title VARCHAR,
+        type VARCHAR,
         year_released INTEGER,
         imdb_link VARCHAR,
         tmdb_link VARCHAR,

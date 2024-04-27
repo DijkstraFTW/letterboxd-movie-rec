@@ -52,8 +52,14 @@ class CollaborativeFilteringModel:
         :rtype: str: returns the saved model path
         """
 
+        # Model parameters
+        n_factors = 150
+        n_epochs = 5
+        lr_all = 0.012
+        reg_all = 0.15
+
         # Training the SVDpp model
-        algo = SVD()
+        algo = SVDpp(n_factors=n_factors, n_epochs=n_epochs, lr_all=lr_all, reg_all=reg_all)
         algo.fit(train_set)
 
         # Training metrics
