@@ -7,6 +7,10 @@ import pandas as pd
 class UserAnalytics:
 
     def __init__(self, db_path, reviews, movies):
+        if os.path.exists(db_path):
+            os.remove(db_path)
+        if os.path.exists(str(db_path) + ".wal"):
+            os.remove(str(db_path) + ".wal")
         self.conn = duckdb.connect(db_path)
         self.cur = self.conn.cursor()
         self.user_reviews = pd.DataFrame(reviews)
@@ -68,7 +72,7 @@ class UserAnalytics:
         :return: dictionary : dictionary with basic metrics
         """
 
-        print(self.conn.execute("SELECT COUNT(*) FROM movies LIMIT 1").fetchdf())
+        print(self.conn.execute("SELECT * FROM movies LIMIT 1").fetchdf())
 
         movies_reviewed = self.conn.execute("""
         SELECT COUNT(*) 
