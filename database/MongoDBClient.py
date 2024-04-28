@@ -68,10 +68,10 @@ class MongoDBClient:
             collection = client[str(self.database)].movies
             result = collection.find()
             result = [item["movie_title_formatted"] for item in result]
-            return list(set(result))
+            return set(result)
         except Exception as e:
             print("Error reading all movies from MongoDB: " + str(e))
-            return []
+            return {}
 
     def read_all_rated_movies(self, client):
         try:
@@ -82,6 +82,16 @@ class MongoDBClient:
         except Exception as e:
             print("Error reading all rated movies from MongoDB: " + str(e))
             return []
+
+    def read_movie(self, client, movie_title):
+        query = {"movie_title": movie_title}
+        try:
+            collection = client[str(self.database)].movies
+            result = collection.find_one(query)
+            return result
+        except Exception as e:
+            print("Error reading movie from MongoDB: " + str(e))
+            return None
 
     def insert_users(self, client, users):
         try:

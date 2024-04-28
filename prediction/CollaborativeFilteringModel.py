@@ -5,6 +5,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from surprise import (Reader, Dataset, SVD, accuracy)
+from surprise.model_selection import cross_validate, GridSearchCV
 
 
 class CollaborativeFilteringModel:
@@ -13,6 +14,8 @@ class CollaborativeFilteringModel:
         self.model = None
         self.df_ratings = pd.DataFrame(ratings)
         self.df_movies = pd.DataFrame(movies)
+        self.user_id_to_int = None
+        self.movie_id_to_int = None
         self.user_id_int = 0
 
     def prepare_dataset(self):
@@ -24,18 +27,18 @@ class CollaborativeFilteringModel:
 
         # Preprocessing the ratings data
         self.df_ratings["rating_val"] = self.df_ratings["rating_val"].astype('float64')
-        user_id_to_int = {user_id: idx for idx, user_id in enumerate(self.df_ratings['user_id'].unique())}
-        movie_id_to_int = {movie_title: idx for idx, movie_title in enumerate(self.df_ratings['movie_title'].unique())}
-        self.df_ratings['user_id_int'] = self.df_ratings['user_id'].map(user_id_to_int)
-        self.df_ratings['movie_id_int'] = self.df_ratings['movie_title'].map(movie_id_to_int)
+        self.user_id_to_int = {user_id: idx for idx, user_id in enumerate(self.df_ratings['user_id'].unique())}
+        self.movie_id_to_int = {movie_title: idx for idx, movie_title in enumerate(self.df_ratings['movie_title'].unique())}
+        self.df_ratings['user_id_int'] = self.df_ratings['user_id'].map(self.user_id_to_int)
+        self.df_ratings['movie_id_int'] = self.df_ratings['movie_title'].map(self.movie_id_to_int)
 
         print("Ratings data successfully preprocessed : ", len(self.df_ratings))
 
         # Splitting the ratings data for training and testing
         train_df, test_df = train_test_split(self.df_ratings, test_size=0.12, random_state=42)
-        reader = Reader(rating_scale=(1, 10))
-        train_data = Dataset.load_from_df(train_df[["user_id_int", "rating_val", "movie_id_int"]], reader)
-        test_data = Dataset.load_from_df(test_df[["user_id_int", "rating_val", "movie_id_int"]], reader)
+        reader = Reader(rating_scale=(0, 10))
+        train_data = Dataset.load_from_df(train_df[["user_id_int", "movie_id_int", "rating_val"]], reader)
+        test_data = Dataset.load_from_df(test_df[["user_id_int", "movie_id_int", "rating_val"]], reader)
 
         trainset = train_data.build_full_trainset()
         testset = test_data.build_full_trainset().build_testset()
@@ -53,15 +56,39 @@ class CollaborativeFilteringModel:
         :rtype: str: returns the saved model path
         """
 
-        # Training the SVD model
-        algo = SVD(n_factors=50, n_epochs=1, lr_all=0.01, reg_all=0.1)
+        param_grid = {
+            'n_factors': [20, 50, 100],
+            'n_epochs': [5, 10, 20, 30],
+            'lr_all': [0.001, 0.005, 0.01],
+            'reg_all': [0.02, 0.1, 0.2]
+        }
+
+        reader = Reader(rating_scale=(1, 10))
+        data = Dataset.load_from_df(self.df_ratings[["user_id_int", "movie_id_int", "rating_val"]], reader)
+
+        svd = SVD(n_epochs=10)
+        results = cross_validate(svd, data, measures=['RMSE', 'MAE'], cv=10, verbose=False)
+        print("Average MAE: ", np.average(results["test_mae"]))
+        print("Average RMSE: ", np.average(results["test_rmse"]))
+
+        gs = GridSearchCV(SVD, param_grid, measures=['rmse', 'mae'], cv=10)
+        gs.fit(data)
+
+        print(gs.best_score['rmse'])
+        print(gs.best_params['rmse'])
+
+        best_factor = gs.best_params['rmse']['n_factors']
+        best_epoch = gs.best_params['rmse']['n_epochs']
+        best_lr = gs.best_params['rmse']['lr_all']
+        best_reg = gs.best_params['rmse']['reg_all']
+
+        algo = SVD(n_factors=best_factor, n_epochs=best_epoch, lr_all=best_lr, reg_all=best_reg)
         algo.fit(train_set)
 
         # Training metrics
         predictions = algo.test(test_set)
-        rmse_value = accuracy.rmse(predictions)
+        accuracy.rmse(predictions)
 
-        print(f"RMSE score : {rmse_value}")
         print("Model trained successfully !")
 
         # Saving the model
@@ -77,7 +104,7 @@ class CollaborativeFilteringModel:
         prediction = self.model.predict(self.user_id_int, movie_id)
         return prediction.est
 
-    def generate_recommendation(self, user_id, number_of_recommendations=10):
+    def generate_recommendation(self, number_of_recommendations=10):
         """
         Generates recommendation items for a given user.
 
@@ -97,7 +124,7 @@ class CollaborativeFilteringModel:
         # Sorting the predictions and returning the top N recommendations
         item_predictions.sort(key=lambda x: x[1], reverse=True)
         top_n_recommendations = item_predictions[:number_of_recommendations]
-        top_n_recommendations = [(self.df_ratings["movie_title"][item], item, rating) for item, rating in
+        top_n_recommendations = [(list(self.movie_id_to_int.keys())[item], item, rating) for item, rating in
                                  top_n_recommendations]
 
         return top_n_recommendations

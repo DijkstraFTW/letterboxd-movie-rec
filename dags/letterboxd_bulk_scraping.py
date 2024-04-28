@@ -25,6 +25,7 @@ default_args = {
 @dag('letterboxd_bulk_scraping_dag', default_args=default_args, schedule='0 3 1 * *', catchup=False,
      description='Scraping Letterboxd data and storing it in MongoDB')
 def letterboxd_bulk_scraping():
+
     # Scraping Users and Reviews
     @task
     def scraping_users_reviews():

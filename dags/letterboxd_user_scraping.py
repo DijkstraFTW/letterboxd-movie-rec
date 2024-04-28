@@ -87,7 +87,7 @@ def letterboxd_user_recommendation():
 
         user_movies = [item["movie_title"] for item in user_reviews]
         user_movies_set = set(user_movies)
-        movies_scraped_set = set(mongodb.read_all_movies_title_formatted(client))
+        movies_scraped_set = mongodb.read_all_movies_title_formatted(client)
         new_movies_list = list(user_movies_set.difference(movies_scraped_set))
 
         print("Adding {} movies to database !".format(len(new_movies_list)))
@@ -105,6 +105,8 @@ def letterboxd_user_recommendation():
         #         combined_movie_item = {**movie, **posters, **themes, **nanogenres, **themoviedb}
         #         if combined_movie_item["type"] != "none":
         #             mongodb.insert_movies(client, combined_movie_item)
+
+        user_movies = [mongodb.read_movie(client, movie) for movie in user_movies]
 
         mongodb.close_conn_to_db(client)
         return user_movies
@@ -125,7 +127,7 @@ def letterboxd_user_recommendation():
         collaborative_filtering.train_model(trainset, testset)
 
         if type == "letterboxd":
-            user_recs = collaborative_filtering.generate_recommendation(user_id, 20)
+            user_recs = collaborative_filtering.generate_recommendation(20)
         elif type == "new":
             user_recs = collaborative_filtering.get_weighted_recommendations(40)
 
@@ -136,7 +138,7 @@ def letterboxd_user_recommendation():
     def get_user_analytics(username: str, user_reviews: list, user_movies: list, type: str):
 
         if type == "letterboxd":
-            user_analytics = UserAnalytics(username, user_reviews, user_movies)
+            user_analytics = UserAnalytics("", user_reviews, user_movies)
             user_analytics.set_user_history_movies()
             user_analytics.set_user_history_reviews()
             user_analytics_data = user_analytics.get_basic_metrics()
