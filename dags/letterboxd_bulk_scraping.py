@@ -34,7 +34,8 @@ def letterboxd_bulk_scraping():
 
         mongodb = MongoDBClient()
         client = mongodb.open_conn_to_db()
-
+        mongodb.delete_all_users(client)
+        mongodb.delete_all_reviews(client)
         mongodb.insert_users(client, top_users)
 
         for user in top_users:

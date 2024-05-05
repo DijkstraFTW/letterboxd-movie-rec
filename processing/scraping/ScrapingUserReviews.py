@@ -13,7 +13,7 @@ class ScrapingUserReviews:
         self.users_diary_pages_url = "https://letterboxd.com/{}/films/diary/by/added/page/{}/"
         self.users_grid_page_number_url = "https://letterboxd.com/{}/films/by/date/"
         self.users_grid_pages_url = "https://letterboxd.com/{}/films/by/date/page/{}/"
-        self.num_top_users_pages = 10
+        self.num_top_users_pages = 100
         self.num_user_ratings_pages = 3
 
     def get_popular_users(self):

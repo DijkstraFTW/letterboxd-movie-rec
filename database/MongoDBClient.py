@@ -136,6 +136,22 @@ class MongoDBClient:
             print("Error getting reviews from MongoDB: " + str(e))
             return []
 
+    def delete_all_reviews(self, client):
+        try:
+            collection = client[self.database].reviews
+            collection.delete_many({})
+            print("Successfully deleted all reviews from MongoDB instance!")
+        except Exception as e:
+            print("Error deleting all reviews from MongoDB : " + str(e))
+
+    def delete_all_users(self, client):
+        try:
+            collection = client[self.database].users
+            collection.delete_many({})
+            print("Successfully deleted all users from MongoDB instance!")
+        except Exception as e:
+            print("Error deleting all users from MongoDB : " + str(e))
+
     def insert_embeddings(self, client, embeddings, df_merged):
         try:
             collection = client[str(self.database)].movies_embeddings
