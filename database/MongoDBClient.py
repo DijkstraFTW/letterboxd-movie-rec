@@ -84,7 +84,7 @@ class MongoDBClient:
             return []
 
     def read_movie(self, client, movie_title):
-        query = {"movie_title": movie_title}
+        query = {"movie_title_formatted": movie_title}
         try:
             collection = client[str(self.database)].movies
             result = collection.find_one(query)
