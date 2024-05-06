@@ -88,6 +88,7 @@ class MongoDBClient:
         try:
             collection = client[str(self.database)].movies
             result = collection.find_one(query)
+            result.pop('_id', None)
             return result
         except Exception as e:
             print("Error reading movie from MongoDB: " + str(e))

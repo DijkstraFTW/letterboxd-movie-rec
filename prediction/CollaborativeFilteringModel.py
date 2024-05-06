@@ -56,31 +56,12 @@ class CollaborativeFilteringModel:
         :rtype: str: returns the saved model path
         """
 
-        param_grid = {
-            'n_factors': [20, 50, 100],
-            'n_epochs': [5, 10, 20, 30],
-            'lr_all': [0.001, 0.005, 0.01],
-            'reg_all': [0.02, 0.1, 0.2]
-        }
+        # Model training
 
-        reader = Reader(rating_scale=(1, 10))
-        data = Dataset.load_from_df(self.df_ratings[["user_id_int", "movie_id_int", "rating_val"]], reader)
-
-        svd = SVD(n_epochs=10)
-        results = cross_validate(svd, data, measures=['RMSE', 'MAE'], cv=10, verbose=False)
-        print("Average MAE: ", np.average(results["test_mae"]))
-        print("Average RMSE: ", np.average(results["test_rmse"]))
-
-        gs = GridSearchCV(SVD, param_grid, measures=['rmse', 'mae'], cv=10)
-        gs.fit(data)
-
-        print(gs.best_score['rmse'])
-        print(gs.best_params['rmse'])
-
-        best_factor = gs.best_params['rmse']['n_factors']
-        best_epoch = gs.best_params['rmse']['n_epochs']
-        best_lr = gs.best_params['rmse']['lr_all']
-        best_reg = gs.best_params['rmse']['reg_all']
+        best_factor = 20
+        best_epoch = 30
+        best_lr = 0.01
+        best_reg = 0.02
 
         algo = SVD(n_factors=best_factor, n_epochs=best_epoch, lr_all=best_lr, reg_all=best_reg)
         algo.fit(train_set)
