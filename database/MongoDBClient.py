@@ -136,13 +136,13 @@ class MongoDBClient:
             print("Error getting reviews from MongoDB: " + str(e))
             return []
 
-    def delete_all_reviews(self, client):
+    def delete_all_ratings(self, client):
         try:
-            collection = client[self.database].reviews
+            collection = client[self.database].ratings
             collection.delete_many({})
-            print("Successfully deleted all reviews from MongoDB instance!")
+            print("Successfully deleted all ratings from MongoDB instance!")
         except Exception as e:
-            print("Error deleting all reviews from MongoDB : " + str(e))
+            print("Error deleting all ratings from MongoDB : " + str(e))
 
     def delete_all_users(self, client):
         try:
