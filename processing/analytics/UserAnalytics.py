@@ -252,7 +252,7 @@ class UserAnalytics:
 
         average_watched_per_day_of_week = self.conn.execute("""
         SELECT
-            EXTRACT(ISODOW FROM CAST(rating_date AS DATE)) AS day_of_week,
+            EXTRACT(ISODOW FROM STRPTIME(rating_date, '%d-%m-%Y')) AS day_of_week,
             COUNT(*) / COUNT(DISTINCT rating_date) AS average_movies_watched
         FROM reviews
         GROUP BY day_of_week
