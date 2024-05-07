@@ -135,7 +135,7 @@ def letterboxd_user_recommendation():
 
     # Getting user analytics
     @task
-    def get_user_analytics(username: str, user_reviews: list, user_movies: list, type: str):
+    def get_user_analytics(user_reviews: list, user_movies: list, type: str):
 
         if type == "letterboxd":
             user_analytics = UserAnalytics("", user_reviews, user_movies)
@@ -156,7 +156,7 @@ def letterboxd_user_recommendation():
     user_movies_shows = scraping_user_movies_shows(reviews_output["user_reviews"])
     user_recommendation = get_user_recommendations(reviews_output["user_reviews"], reviews_output["user_id"],
                                                    context_output["type"])
-    user_analytics = get_user_analytics(context_output["username"], reviews_output["user_reviews"],
+    user_analytics = get_user_analytics(reviews_output["user_reviews"],
                                         user_movies_shows, context_output["type"])
     write_to_redis(context_output["username"], user_recommendation, user_analytics)
 
