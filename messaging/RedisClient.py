@@ -1,6 +1,9 @@
 import json
 import os
+
 import redis
+
+from processing.utils.utils import default_converter
 
 
 class RedisClient:
@@ -25,5 +28,6 @@ class RedisClient:
                                 'username': username,
                                 'user_recommendation': user_recommendation,
                                 'user_analytics': user_analytics
-                            })
+                            }, default=default_converter)
                             )
+

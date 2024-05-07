@@ -1,6 +1,8 @@
 import string
 import os
 import datetime
+
+import numpy as np
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 
@@ -65,3 +67,9 @@ def val2stars(index):
     :return: str : the star rating
     """
     return f"{index * 2}"
+
+
+def default_converter(obj):
+    if isinstance(obj, np.integer):
+        return int(obj)
+    raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
