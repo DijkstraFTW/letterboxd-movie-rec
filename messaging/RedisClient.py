@@ -22,7 +22,7 @@ class RedisClient:
         :param user_analytics: dictionary of user analytics
         """
         print(f'Publishing recommendation and analytics to Redis queue {self.RECS_QUEUE}: \n',
-              user_recommendation, user_analytics)
+              username, user_recommendation, user_analytics)
         self.client.publish(self.RECS_QUEUE,
                             json.dumps({
                                 'username': username,
