@@ -15,6 +15,7 @@ class UserAnalytics:
         self.cur = self.conn.cursor()
         self.user_reviews = pd.DataFrame(reviews)
         self.user_movies = pd.DataFrame(movies)
+        self.user_movies = self.user_movies.astype(str)
 
     def set_user_history_reviews(self):
         """
