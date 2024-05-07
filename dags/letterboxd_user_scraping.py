@@ -107,6 +107,7 @@ def letterboxd_user_recommendation():
         #             mongodb.insert_movies(client, combined_movie_item)
 
         user_movies = [mongodb.read_movie(client, movie) for movie in user_movies]
+        user_movies = list(set(user_movies))
 
         mongodb.close_conn_to_db(client)
         return user_movies

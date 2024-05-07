@@ -32,7 +32,7 @@ class UserAnalytics:
             'spoken_languages': str,
             'popularity': 'float64',
             'overview': str,
-            'runtime': int,
+            'runtime': 'float64',
             'vote_average': 'float64',
             'vote_count': int,
             'release_date': 'datetime64',
