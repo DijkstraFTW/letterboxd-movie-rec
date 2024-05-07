@@ -15,7 +15,32 @@ class UserAnalytics:
         self.cur = self.conn.cursor()
         self.user_reviews = pd.DataFrame(reviews)
         self.user_movies = pd.DataFrame(movies)
-        self.user_movies = self.user_movies.astype(str)
+        self.user_movies = self.user_movies.astype({
+            'movie_title_formatted': str,
+            'movie_title': str,
+            'type': str,
+            'year_released': int,
+            'imdb_link': str,
+            'tmdb_link': str,
+            'imdb_id': str,
+            'tmdb_id': str,
+            'lb_rating': 'float64',
+            'histogram': str,
+            'poster_url': str,
+            'genres': str,
+            'production_countries': str,
+            'spoken_languages': str,
+            'popularity': 'float64',
+            'overview': str,
+            'runtime': int,
+            'vote_average': 'float64',
+            'vote_count': int,
+            'release_date': 'datetime64',
+            'original_language': str,
+            'last_updated': 'datetime64',
+            'themes': str,
+            'nanogenres': str
+        })
 
     def set_user_history_reviews(self):
         """
