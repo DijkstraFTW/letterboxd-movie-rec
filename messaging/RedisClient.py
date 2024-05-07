@@ -8,7 +8,7 @@ from processing.utils.utils import default_converter
 
 class RedisClient:
     def __init__(self):
-        self.URL = os.getenv('REDIS_URL')
+        self.URL = os.getenv('REDIS_HOST')
         self.PORT = os.getenv('REDIS_PORT')
         self.DB = os.getenv('REDIS_DB')
         self.RECS_QUEUE = os.getenv('REDIS_QUEUE_RECS')
