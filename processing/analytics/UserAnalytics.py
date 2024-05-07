@@ -35,9 +35,9 @@ class UserAnalytics:
             'runtime': 'float64',
             'vote_average': 'float64',
             'vote_count': int,
-            'release_date': 'datetime64',
+            'release_date': 'datetime64[ns]',
             'original_language': str,
-            'last_updated': 'datetime64',
+            'last_updated': 'datetime64[ns]',
             'themes': str,
             'nanogenres': str
         })
