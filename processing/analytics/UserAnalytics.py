@@ -16,12 +16,12 @@ class UserAnalytics:
         self.user_reviews = pd.DataFrame(reviews)
         self.user_reviews = self.user_reviews.astype({
             'movie_title': str,
+            'rating_date': str,
             'rating_val': 'float64',
             'user_id': str,
             'is_rewatch': bool,
             'is_review': bool
         })
-        self.user_reviews['rating_date'] = pd.to_datetime(self.user_reviews['rating_date'], format='%d-%m-%Y')
         self.user_movies = pd.DataFrame(movies)
         self.user_movies = self.user_movies.astype({
             'movie_title_formatted': str,
@@ -57,7 +57,7 @@ class UserAnalytics:
         self.conn.execute("""
         CREATE TABLE reviews(
         movie_title VARCHAR,
-        rating_date DATE,
+        rating_date VARCHAR,
         rating_val INTEGER,
         user_id VARCHAR,
         is_rewatch BOOLEAN,
