@@ -6,7 +6,6 @@
 The Letterboxd Movie Recommender System is a hybrid recommendation system that suggests movies to users based on their Letterboxd activity. The system combines collaborative filtering and content-based filtering techniques to provide personalized and diverse movie recommendations.
 
 ## IN PROGRESS
-- Modules tests
 - Content-based filtering
 - Hybrid recommendation model
 - Webapp
