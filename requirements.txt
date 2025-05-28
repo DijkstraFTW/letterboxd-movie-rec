@@ -16,7 +16,7 @@ soupsieve==2.5
 tqdm==4.66.1
 tzdata==2023.4
 urllib3==2.1.0
-apache-airflow==2.8.1
+apache-airflow==2.7.2
 redis==4.1.1
 nltk==3.6.5
 
