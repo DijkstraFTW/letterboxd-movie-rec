@@ -73,3 +73,51 @@ def default_converter(obj):
     if isinstance(obj, np.integer):
         return int(obj)
     raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
+
+def load_latest_model(models_dir: str):
+    """
+    Automatically loads the latest model based on filename pattern containing month and year.
+    
+    Args:
+        models_dir (str): Directory containing model files
+        pattern (str): Filename pattern to match (e.g., "svd_model_*_*.pkl")
+    
+    Returns:
+        Loaded model object or None if no model found
+    """
+    models_dir="../prediction/models"
+    pattern="svd_model_*_*.pkl"
+    models_path = Path(models_dir)
+    model_files = list(models_path.glob(pattern))
+    
+    if not model_files:
+        print(f"No model files found matching pattern: {pattern}")
+        return None
+    dated_models = []
+    date_pattern = r"svd_model_(\d{1,2})_(\d{4})\.pkl"
+    
+    for file in model_files:
+        match = re.search(date_pattern, file.name)
+        if match:
+            month, year = int(match.group(1)), int(match.group(2))
+            dated_models.append((file, datetime(year, month, 1)))
+    
+    if not dated_models:
+        print("No valid dated model files found")
+        return None
+    
+    dated_models.sort(key=lambda x: x[1], reverse=True)
+    
+    latest_file, latest_date = dated_models[0]
+    
+    print(f"Loading latest model: {latest_file.name} (from {latest_date.strftime('%B %Y')})")
+    
+    try:
+        with open(latest_file, 'rb') as f:
+            model = pickle.load(f)
+        print("Model loaded successfully!")
+        return model
+    except Exception as e:
+        print(f"Error loading model: {e}")
+        return None
+

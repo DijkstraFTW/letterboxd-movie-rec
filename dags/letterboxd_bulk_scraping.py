@@ -3,13 +3,14 @@ import sys
 sys.path.insert(0, "/home/ubuntu/app/")
 
 from datetime import datetime, timedelta
-
+import math
+import asyncio
 from airflow.decorators import dag, task
 from dotenv import load_dotenv
 
 from database.MongoDBClient import MongoDBClient
-from processing.scraping.ScrapingMovies import ScrapingMovies
-from processing.scraping.ScrapingUserReviews import ScrapingUserReviews
+from processing.scraping.MoviesScraping import MoviesScraping
+from processing.scraping.UserReviewsScraping import UserReviewsScraping
 
 load_dotenv()
 
@@ -18,19 +19,20 @@ default_args = {
     'start_date': datetime(2024, 1, 1),
     'depends_on_past': False,
     'retries': 1,
-    'retry_delay': timedelta(minutes=5)
+    'retry_delay': timedelta(minutes=5),
 }
 
 
-@dag('letterboxd_bulk_scraping_dag', default_args=default_args, schedule='0 3 1 * *', catchup=False,
-     description='Scraping Letterboxd data and storing it in MongoDB')
+@dag('letterboxd_bulk_scraping_dag', 
+    default_args=default_args, schedule='0 3 1 * *', catchup=False, concurrency=4, 
+    description='Scraping Letterboxd data and storing it in MongoDB')
 def letterboxd_bulk_scraping():
 
     # Scraping Users and Reviews
     @task
     def scraping_users_reviews():
-        scraping_user_reviews = ScrapingUserReviews()
-        top_users = scraping_user_reviews.get_popular_users()
+        user_reviews_scraping = UserReviewsScraping()
+        top_users = user_reviews_scraping.get_popular_users()
 
         mongodb = MongoDBClient()
         client = mongodb.open_conn_to_db()
@@ -39,13 +41,13 @@ def letterboxd_bulk_scraping():
         mongodb.insert_users(client, top_users)
 
         for user in top_users:
-            mongodb.insert_ratings(client, scraping_user_reviews.get_user_ratings(user['username'], user['user_id']))
+            mongodb.insert_ratings(client, user_reviews_scraping.get_user_ratings(user['username'], user['user_id']))
 
         mongodb.close_conn_to_db(client)
 
-    # Scraping Movies and Shows
+    # Batching Movies and Shows
     @task
-    def scraping_movies_shows():
+    def batching_movies_shows(batch_size=100):
         mongodb = MongoDBClient()
         client = mongodb.open_conn_to_db()
 
@@ -54,24 +56,64 @@ def letterboxd_bulk_scraping():
         updated_movies_set = set(movies_list)
         movies_to_scrap_list = list(updated_movies_set.difference(existing_movies_set))
 
-        scraping_movies = ScrapingMovies(movies_to_scrap_list)
-        letterboxd_movies = scraping_movies.get_rated_movies()
+        num_batches = math.ceil(len(movies_to_scrap_list) / batch_size)
+        return [movies_to_scrap_list[i*batch_size:(i+1)*batch_size] for i in range(num_batches)]
 
-        for movie in letterboxd_movies:
-            posters = scraping_movies.get_movie_posters(movie)
-            themoviedb = scraping_movies.get_themoviedb_data(movie, movie["type"])
-            themes = scraping_movies.get_movies_themes(movie)
-            nanogenres = scraping_movies.get_movies_nanogenres(movie)
-            combined_movie_item = {**movie, **posters, **themoviedb, **themes, **nanogenres}
-            if combined_movie_item["type"] != "none":
-                mongodb.insert_movies(client, combined_movie_item)
+    # Scraping Movies and Shows
+    @task
+    def scraping_movies_shows(batch):
 
-        mongodb.close_conn_to_db(client)
+        async def scrape_movies_async():
+            mongodb = MongoDBClient()
+            client = mongodb.open_conn_to_db()
+            movies_scraping = MoviesScraping(batch, max_concurrent=4, requests_per_second=2)
+            
+            async with movies_scraping:
+                letterboxd_movies = await movies_scraping.get_rated_movies()
+
+                tasks = []
+                for movie in letterboxd_movies:
+                    tasks.append(movies_scraping.fetch_movie_posters(movie))
+                    if movie["type"] != "none" and movie.get("tmdb_id"):
+                        tasks.append(movies_scraping.fetch_themoviedb_data(movie, movie["type"]))
+                    tasks.append(movies_scraping.fetch_movies_genres(movie, "themes"))
+                    tasks.append(movies_scraping.fetch_movies_genres(movie, "nanogenres"))
+
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                result_index = 0
+                for movie in letterboxd_movies:
+                    posters = results[result_index] if not isinstance(results[result_index], Exception) else {}
+                    result_index += 1
+                    
+                    themoviedb = {}
+                    if movie["type"] != "none" and movie.get("tmdb_id"):
+                        themoviedb = results[result_index] if not isinstance(results[result_index], Exception) else {}
+                        result_index += 1
+                    
+                    themes = results[result_index] if not isinstance(results[result_index], Exception) else {"themes": []}
+                    result_index += 1
+                    
+                    nanogenres = results[result_index] if not isinstance(results[result_index], Exception) else {"nanogenres": []}
+                    result_index += 1
+                    
+                    combined_movie_item = {**movie, **posters, **themoviedb, **themes, **nanogenres}
+                    
+                    if combined_movie_item["type"] != "none":
+                        mongodb.insert_movies(client, combined_movie_item)
+
+            mongodb.close_conn_to_db(client)
+        
+        asyncio.run(scrape_movies_async())
+
 
     scrape_users_reviews_task = scraping_users_reviews()
+    batch_movies_shows_task = batching_movies_shows()
     scrape_movies_shows_task = scraping_movies_shows()
 
-    scrape_users_reviews_task >> scrape_movies_shows_task
+    scrape_movies_shows_task.expand(batch=batch_movies_shows_task.output)
+
+    scrape_users_reviews_task >> batch_movies_shows_task >> scrape_movies_shows_task
 
 
 letterboxd_bulk_scraping = letterboxd_bulk_scraping()

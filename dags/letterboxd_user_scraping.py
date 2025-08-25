@@ -1,21 +1,20 @@
 import sys
 import uuid
-
-from airflow.models import DagRun
+import asyncio
 
 sys.path.insert(0, "/home/ubuntu/app/")
 
 from datetime import datetime, timedelta
 
 from airflow.decorators import dag, task
+from airflow.models import DagRun
 from dotenv import load_dotenv
 
 from database.MongoDBClient import MongoDBClient
 from messaging.RedisClient import RedisClient
-from prediction.CollaborativeFilteringModel import CollaborativeFilteringModel
+from prediction.RecommendationEngine import RecommendationEngine
 from processing.analytics.UserAnalytics import UserAnalytics
-from processing.scraping.ScrapingMovies import ScrapingMovies
-from processing.scraping.ScrapingUserReviews import ScrapingUserReviews
+from processing.utils import load_latest_model
 
 load_dotenv()
 
@@ -30,10 +29,9 @@ default_args = {
 
 
 @dag('letterboxd_recommendation_dag', default_args=default_args, schedule=None,
-     description='Scrapes user reviews from Letterboxd and provides recommendations based on '
-                 'stored users watch history.')
+     description='Provides recommendations for a user based on a pre-trained model.')
 def letterboxd_user_recommendation():
-    # Setting up the context
+
     @task(multiple_outputs=True, provide_context=True)
     def setup_context(**context):
         dag_run = context['dag_run']
@@ -48,104 +46,82 @@ def letterboxd_user_recommendation():
 
         return dict(username=username, type=type, data_opt_out=data_opt_out)
 
-    # Scraping the user's reviews
     @task(multiple_outputs=True)
     def scraping_user_reviews(username: str, data_opt_out: bool):
+        async def scrape_user_data():
+            async with UserReviewsScraping() as scraper:
+                mongodb = MongoDBClient()
+                client = mongodb.open_conn_to_db()
+                user_found = mongodb.find_user(client, username) == 1
 
-        # check if user exists already
-        mongodb = MongoDBClient()
-        client = mongodb.open_conn_to_db()
-        user_found = mongodb.find_user(client, username) == 1
+                if not user_found:
+                    print("User not found in database, scraping data...")
+                    user_data = await scraper.get_user(username)
+                    if not user_data:
+                        return dict(user_reviews=[], user_id=None)
+                    
+                    user_id = user_data["user_id"]
+                    ratings = await scraper.get_user_ratings(username, user_id, return_unrated=True)
+                    ratings = [x for x in ratings if x["rating_val"] >= 0]
 
-        # user doesn't exist
-        if not user_found:
-            scraping_user_reviews = ScrapingUserReviews()
-            user_id = str(uuid.uuid4())
-            ratings = scraping_user_reviews.get_user_ratings(username, user_id, data_opt_out)
+                    if not data_opt_out:
+                        print("Inserting user data into database...")
+                        mongodb.insert_users(client, user_data)
+                        mongodb.insert_ratings(client, ratings)
 
-            if not data_opt_out:
-                user = scraping_user_reviews.get_user(username)
-                mongodb.insert_users(client, user)
-                mongodb.insert_ratings(client, ratings)
+                    user_reviews = ratings
 
-            user_reviews = ratings
+                else:
+                    print("User found in database, fetching data...")
+                    user_id = mongodb.get_user_custom_id(client, username)
+                    user_reviews = mongodb.get_reviews_by_user_id(client, user_id)
 
-        # user exists
-        else:
-            user_id = mongodb.get_user_custom_id(client, username)
-            user_reviews = mongodb.get_reviews_by_user_id(client, user_id)
+                mongodb.close_conn_to_db(client)
+                return dict(user_reviews=user_reviews, user_id=user_id)
 
-        mongodb.close_conn_to_db(client)
-        return dict(user_reviews=user_reviews, user_id=user_id)
+        return asyncio.run(scrape_user_data())
 
-    # Scraping the user's movies and shows
     @task
-    def scraping_user_movies_shows(user_reviews: list):
+    def load_pre_trained_model():
+        """
+        Task to load the pre-trained model bundle into memory.
+        """
 
-        mongodb = MongoDBClient()
-        client = mongodb.open_conn_to_db()
+        print("Loading pre-trained recommendation model...")
+        engine = RecommendationEngine()
+        engine.load_bundle(load_latest_model())
+        return engine
 
-        user_movies = [item["movie_title"] for item in user_reviews]
-        user_movies_set = set(user_movies)
-        movies_scraped_set = mongodb.read_all_movies_title_formatted(client)
-        new_movies_list = list(user_movies_set.difference(movies_scraped_set))
-
-        print("Adding {} movies to database !".format(len(new_movies_list)))
-
-        # if len(new_movies_list) != 0:
-        #
-        #     scraping_movies = ScrapingMovies(new_movies_list)
-        #     new_movies = scraping_movies.get_rated_movies()
-        #
-        #     for movie in new_movies:
-        #         posters = scraping_movies.get_movie_posters(movie)
-        #         themes = scraping_movies.get_movie_themes(movie)
-        #         nanogenres = scraping_movies.get_movie_nanogenres(movie)
-        #         themoviedb = scraping_movies.get_themoviedb_data(movie, movie["type"])
-        #         combined_movie_item = {**movie, **posters, **themes, **nanogenres, **themoviedb}
-        #         if combined_movie_item["type"] != "none":
-        #             mongodb.insert_movies(client, combined_movie_item)
-
-        user_movies = [mongodb.read_movie(client, movie) for movie in user_movies]
-
-        mongodb.close_conn_to_db(client)
-        return user_movies
-
-    # Getting user recommendations
     @task
-    def get_user_recommendations(user_reviews: list, user_id: str, type: str = "new"):
-        user_recs = []
-
-        mongodb = MongoDBClient()
-        client = mongodb.open_conn_to_db()
-        reviews = mongodb.read_all_ratings(client)
-        movies = mongodb.read_all_movies_title_formatted(client)
-        all_reviews = user_reviews + reviews
-
-        collaborative_filtering = CollaborativeFilteringModel(all_reviews, movies)
-        trainset, testset = collaborative_filtering.prepare_dataset()
-        collaborative_filtering.train_model(trainset, testset)
-
+    def get_user_recommendations(engine, user_reviews: list, user_id: str, type: str = "new"):
+        """
+        Uses the pre-trained model to generate recommendations for the new user.
+        """
+        print(f"Generating recommendations for user {user_id}...")
+        
+        user_ratings_tuples = [(review['movie_title'], review['rating_val']) for review in user_reviews]
+        
+        
         if type == "letterboxd":
-            user_recs = collaborative_filtering.generate_recommendation(20)
+            recommendations_df = engine.generate_recommendations(user_ratings_tuples, n=20, hybrid_weight=0.9)
         elif type == "new":
-            user_recs = collaborative_filtering.get_weighted_recommendations(40)
+            recommendations_df = engine.generate_recommendations(user_ratings_tuples, n=40, hybrid_weight=0.7)
+        else:
+            recommendations_df = engine.generate_recommendations(user_ratings_tuples, n=20, hybrid_weight=0.7)
+        
+        recommendations_list = recommendations_df.to_dict('records')
+        return recommendations_list
 
-        return user_recs
-
-    # Getting user analytics
     @task
-    def get_user_analytics(user_reviews: list, user_movies: list, type: str):
-
+    def get_user_analytics(user_reviews: list, type: str):
         if type == "letterboxd":
-            user_analytics = UserAnalytics("", user_reviews, user_movies)
+            user_analytics = UserAnalytics("", user_reviews, [])
             user_analytics.set_user_history_movies()
             user_analytics.set_user_history_reviews()
             user_analytics_data = user_analytics.get_basic_metrics()
             return user_analytics_data
         return {}
 
-    # Writing to Redis
     @task
     def write_to_redis(username: str, user_recommendation: list, user_analytics: dict):
         redis_client = RedisClient()
@@ -153,12 +129,19 @@ def letterboxd_user_recommendation():
 
     context_output = setup_context()
     reviews_output = scraping_user_reviews(context_output["username"], context_output["data_opt_out"])
-    user_movies_shows = scraping_user_movies_shows(reviews_output["user_reviews"])
-    user_recommendation = get_user_recommendations(reviews_output["user_reviews"], reviews_output["user_id"],
-                                                   context_output["type"])
-    user_analytics = get_user_analytics(reviews_output["user_reviews"],
-                                        user_movies_shows, context_output["type"])
+    
+    pre_trained_engine = load_pre_trained_model()
+    
+    user_recommendation = get_user_recommendations(
+        pre_trained_engine, 
+        reviews_output["user_reviews"], 
+        reviews_output["user_id"],
+        context_output["type"]
+    )
+    
+    user_analytics = get_user_analytics(reviews_output["user_reviews"], context_output["type"])
     write_to_redis(context_output["username"], user_recommendation, user_analytics)
 
 
 letterboxd_user_recommendation = letterboxd_user_recommendation()
+

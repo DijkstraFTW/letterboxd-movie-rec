@@ -19,4 +19,5 @@ urllib3==2.1.0
 apache-airflow==2.8.1
 redis==4.1.1
 nltk==3.6.5
-
+aiohttp
+aiofiles
