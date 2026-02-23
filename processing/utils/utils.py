@@ -1,11 +1,33 @@
 import string
 import os
 import re
-import pickle
 from pathlib import Path
 from datetime import datetime
 
 import numpy as np
+
+STOPWORDS = {
+    "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
+    "of", "with", "by", "from", "is", "was", "are", "were", "be", "been",
+    "being", "have", "has", "had", "do", "does", "did", "will", "would",
+    "could", "should", "may", "might", "shall", "can", "not", "no", "nor",
+    "so", "yet", "both", "either", "neither", "as", "if", "then", "than",
+    "that", "this", "these", "those", "it", "its", "he", "she", "they",
+    "we", "you", "i", "me", "him", "her", "us", "them", "my", "your",
+    "his", "our", "their", "what", "which", "who", "whom", "when", "where",
+    "why", "how", "all", "each", "every", "any", "some", "more", "most",
+    "other", "into", "through", "during", "about", "after", "before",
+}
+
+
+def remove_stopwords(text: str) -> str:
+    """
+    Removes common English stopwords and punctuation from text.
+    :return: str : cleaned text
+    """
+    text = text.lower().translate(str.maketrans("", "", string.punctuation))
+    return " ".join(word for word in text.split() if word not in STOPWORDS)
+
 
 def create_bag_of_words(x):
     """
@@ -59,7 +81,7 @@ def default_converter(obj):
 
 def load_latest_model(models_dir: str = "../prediction/models"):
     """
-    Automatically loads the latest model based on filename pattern containing month and year.
+    Automatically loads the latest model based on filename pattern containing week, month and year.
 
     Args:
         models_dir (str): Directory containing model files (default: "../prediction/models")
@@ -67,38 +89,31 @@ def load_latest_model(models_dir: str = "../prediction/models"):
     Returns:
         Loaded model object or None if no model found
     """
-    pattern = "svd_model_*_*.pkl"
+    pattern = "svd_model_*_*_*.pkl"
     models_path = Path(models_dir)
     model_files = list(models_path.glob(pattern))
-    
+
     if not model_files:
         print(f"No model files found matching pattern: {pattern}")
         return None
     dated_models = []
-    date_pattern = r"svd_model_(\d{1,2})_(\d{4})\.pkl"
-    
+    date_pattern = r"svd_model_(\d{1,2})_(\d{1,2})_(\d{4})\.pkl"
+
     for file in model_files:
         match = re.search(date_pattern, file.name)
         if match:
-            month, year = int(match.group(1)), int(match.group(2))
-            dated_models.append((file, datetime(year, month, 1)))
-    
+            week, month, year = int(match.group(1)), int(match.group(2)), int(match.group(3))
+            dated_models.append((file, (year, month, week)))
+
     if not dated_models:
         print("No valid dated model files found")
         return None
-    
+
     dated_models.sort(key=lambda x: x[1], reverse=True)
+
+    latest_file, (year, month, week) = dated_models[0]
+
+    print(f"Loading latest model: {latest_file.name} (week {week}, {datetime(year, month, 1).strftime('%B %Y')})")
     
-    latest_file, latest_date = dated_models[0]
-    
-    print(f"Loading latest model: {latest_file.name} (from {latest_date.strftime('%B %Y')})")
-    
-    try:
-        with open(latest_file, 'rb') as f:
-            model = pickle.load(f)
-        print("Model loaded successfully!")
-        return model
-    except Exception as e:
-        print(f"Error loading model: {e}")
-        return None
+    return str(latest_file)
 

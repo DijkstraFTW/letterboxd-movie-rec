@@ -79,7 +79,7 @@ function ChartPieSimple({
                       .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
                       .join(' ')
 
-                  const percent = Math.round((value / total) * 100)
+                  const percent = ((value / total) * 100).toFixed(2)
 
                   return (
                     <div className="rounded-lg border bg-background p-3 shadow-sm">

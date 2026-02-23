@@ -472,6 +472,7 @@ ${DB_WANTS_LINE}
 
 [Service]
 Environment="AIRFLOW_HOME=${AIRFLOW_HOME}"
+Environment="PATH=${AIRFLOW_HOME}/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 User=${AIRFLOW_USER}
 Group=${AIRFLOW_USER}
 Type=simple

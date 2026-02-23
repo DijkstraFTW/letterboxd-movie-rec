@@ -1,1209 +1,739 @@
-import { useEffect, useState } from "react";
-
-import ChartPieSimple from "./ChartPieSimple.tsx";
-import ChartPieSimpleToggable from "./ChartPieSimpleToggable.tsx";
-import BarChartDefault from "./BarChartDefault.tsx";
-import BarChartDefaultYears from "./BarChartDefaultYears.tsx";
-
-type ChartConfig = {
-  [key: string]: {
-    label: string;
-    color?: string;
-  };
-};
-
+import { useState, useMemo } from "react";
+import {
+  ScatterChart, Scatter, XAxis, YAxis, Tooltip, Cell, ReferenceLine,
+  Line, Area, AreaChart,
+  Treemap, ResponsiveContainer, CartesianGrid, Customized,
+} from "recharts";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "../../shadcn/components/ui/card.tsx"
-import MovieCarousel from "./MovieCarousel.tsx";
-import ChartBarMixedMostWatched from "./ChartBarMixedMostWatched.tsx";
-import ChartBarMixedDecades from "./ChartBarMixedDecades.tsx";
+} from "../../shadcn/components/ui/card.tsx";
 
-
-function Counter({ end, duration = 2000 }: { end: number; duration?: number }) {
-  const [value, setValue] = useState(0);
-
-  useEffect(() => {
-    let start: number | null = null;
-    const step = (timestamp: number) => {
-      if (!start) start = timestamp;
-      const progress = Math.min((timestamp - start) / duration, 1);
-
-      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
-      setValue(Math.floor(eased * end));
-
-      if (progress < 1) requestAnimationFrame(step);
-    };
-
-    requestAnimationFrame(step);
-  }, [end, duration]);
-
-  return <>{value}</>;
-}
-
-
-/**
- * DATA STRUCTURE DOCUMENTATION FOR BACKEND
- *
- * This section defines the expected data format for all charts in the UserMetrics component.
- * Each chart has a single data source with a specific structure.
- *
- * When sending data from the backend, follow these exact structures:
- * - Each data array should contain objects with the specified keys
- * - DO NOT include "fill" or "color" properties - charts auto-generate colors
- * - Config objects are defined on the frontend for labels and display
- */
-
-// 1. Viewing Habits Data (watch vs rewatch)
-const viewingHabitsData = [
-  { category: "new watch", count: 850 },
-  { category: "rewatch", count: 150 },
-]
-
-const viewingHabitsConfig = {
-  new_watch: { label: "New Adventures", color: "var(--color-new-watch)" },
-  rewatch: { label: "Comfort Views", color: "var(--color-rewatch)" },
-} satisfies ChartConfig
-
-// 2. Taste Alignment Data (rating comparison with average)
-const tasteAlignmentData = [
-  { category: "above average", count: 320 },
-  { category: "similar to the average", count: 520 },
-  { category: "below average", count: 160 },
-]
-
-const tasteAlignmentConfig = {
-  above_avg: { label: "Your Unique Loves", color: "var(--color-above-avg)" },
-  similar_avg: { label: "In Agreement", color: "var(--color-similar-avg)" },
-  below_avg: { label: "Your Contrarian Takes", color: "var(--color-below-avg)" },
-} satisfies ChartConfig
-
-// 3. Weekly Rhythm Data (movies watched per day of week)
-const weeklyRhythmData = [
-  { day: "Monday", count: 45 },
-  { day: "Tuesday", count: 32 },
-  { day: "Wednesday", count: 38 },
-  { day: "Thursday", count: 28 },
-  { day: "Friday", count: 67 },
-  { day: "Saturday", count: 89 },
-  { day: "Sunday", count: 76 },
-]
-
-const weeklyRhythmConfig = {
-  count: { label: "Movies Watched", color: "var(--chart-1)" },
-} satisfies ChartConfig
-
-// 4. Ratings Per Decade Data (average rating by decade)
-const ratingsPerDecadeData = [
-  { decade: "1950", avg_rating: 7.8 },
-  { decade: "1960", avg_rating: 8.2 },
-  { decade: "1970", avg_rating: 9.2 },
-  { decade: "1980", avg_rating: 7.9 },
-  { decade: "1990", avg_rating: 6.5 },
-]
-
-const ratingsPerDecadeConfig = {
-  "1950": { label: "1950s" },
-  "1960": { label: "1960s" },
-  "1970": { label: "1970s" },
-  "1980": { label: "1980s" },
-  "1990": { label: "1990s" },
-  "2000": { label: "2000s" },
-  "2010": { label: "2010s" },
-  "2020": { label: "2020s" },
-} satisfies ChartConfig
-
-// 5. Top Genres Data
-const topGenresAltData = [
-  { genre: "drama", count: 245 },
-  { genre: "action", count: 189 },
-  { genre: "comedy", count: 156 },
-  { genre: "thriller", count: 134 },
-  { genre: "scifi", count: 98 },
-]
-
-const topGenresData = [
-  { genre: "horror", count: 6.7 },
-  { genre: "romance", count: 5.4 },
-  { genre: "documentary", count: 4.3 },
-  { genre: "animation", count: 3.8 },
-]
-
-const topGenresConfig = {
-  drama: { label: "Drama", color: "var(--color-drama)" },
-  action: { label: "Action", color: "var(--color-action)" },
-  comedy: { label: "Comedy", color: "var(--color-comedy)" },
-  thriller: { label: "Thriller", color: "var(--color-thriller)" },
-  scifi: { label: "Sci-Fi", color: "var(--color-scifi)" },
-  horror: { label: "Horror", color: "var(--color-horror)" },
-  romance: { label: "Romance", color: "var(--color-romance)" },
-  documentary: { label: "Documentary", color: "var(--color-documentary)" },
-  animation: { label: "Animation", color: "var(--color-animation)" },
-} satisfies ChartConfig
-
-// 6. Top Nanogenres Data
-const topNanogenresAltData = [
-  { nanogenre: "emotional storytelling", count: 156 },
-  { nanogenre: "intense action", count: 142 },
-  { nanogenre: "dark mystery", count: 128 },
-  { nanogenre: "sci-fi adventure", count: 95 },
-]
-
-const topNanogenresData = [
-  { nanogenre: "Romantic Drama", count: 7.8 },
-  { nanogenre: "Suspense Thriller", count: 6.5 },
-  { nanogenre: "Comedic Adventure", count: 5.2 },
-]
-
-const topNanogenresConfig = {
-  emotional_storytelling: { label: "Emotional Storytelling", color: "var(--color-nano-1)" },
-  intense_action: { label: "Intense Action", color: "var(--color-nano-2)" },
-  dark_mystery: { label: "Dark Mystery", color: "var(--color-nano-3)" },
-  sci_fi_adventure: { label: "Sci-Fi Adventure", color: "var(--color-nano-4)" },
-  romantic_drama: { label: "Romantic Drama", color: "var(--color-nano-5)" },
-  suspense_thriller: { label: "Suspense Thriller", color: "var(--color-nano-6)" },
-  comedic_adventure: { label: "Comedic Adventure", color: "var(--color-nano-7)" },
-} satisfies ChartConfig
-
-// 7. Favorite Language Data
-const favoriteLanguageData = [
-  { language: "english", count: 678 },
-  { language: "french", count: 145 },
-  { language: "spanish", count: 98 },
-  { language: "japanese", count: 67 },
-]
-
-const favoriteLanguageAltData = [
-  { language: "korean", count: 54 },
-  { language: "german", count: 43 },
-  { language: "italian", count: 38 },
-]
-
-const favoriteLanguageConfig = {
-  english: { label: "English", color: "var(--color-lang-1)" },
-  french: { label: "French", color: "var(--color-lang-2)" },
-  spanish: { label: "Spanish", color: "var(--color-lang-3)" },
-  japanese: { label: "Japanese", color: "var(--color-lang-4)" },
-  korean: { label: "Korean", color: "var(--color-lang-5)" },
-  german: { label: "German", color: "var(--color-lang-6)" },
-  italian: { label: "Italian", color: "var(--color-lang-7)" },
-} satisfies ChartConfig
-
-// 8. Ratings Per Year Data (already well-structured)
-const ratingsPerYearData = [{'year_released': 1962, 'average_rating': 8.0}, {
-        'year_released': 1990,
-        'average_rating': 8.0
-    }, {'year_released': 1999, 'average_rating': 7.0}, {
-        'year_released': 2001,
-        'average_rating': 6.0
-    }, {'year_released': 2002, 'average_rating': 7.5}, {
-        'year_released': 2005,
-        'average_rating': 6.333333333333333
-    }, {'year_released': 2006, 'average_rating': 7.0}, {
-        'year_released': 2007,
-        'average_rating': 8.0
-    }, {'year_released': 2008, 'average_rating': 4.0}, {
-        'year_released': 2010,
-        'average_rating': 8.5
-    }, {'year_released': 2011, 'average_rating': 6.0}, {
-        'year_released': 2013,
-        'average_rating': 6.5
-    }, {'year_released': 2014, 'average_rating': 5.75}, {
-        'year_released': 2015,
-        'average_rating': 7.0
-    }, {'year_released': 2016, 'average_rating': 6.5}, {
-        'year_released': 2017,
-        'average_rating': 6.0
-    }, {'year_released': 2018, 'average_rating': 6.5}, {
-        'year_released': 2019,
-        'average_rating': 6.0
-    }, {'year_released': 2021, 'average_rating': 7.2}, {
-        'year_released': 2022,
-        'average_rating': 6.625
-    }, {'year_released': 2023, 'average_rating': 6.4375}, {'year_released': 2024, 'average_rating': 8.5}]
-
-// 9. Most Watched Movies Data (with poster URLs)
-const mostWatchedMoviesData = [
-  {
-    title: "Dune: Part Two",
-    count: 8,
-    poster_url: "https://a.ltrbxd.com/resized/film-poster/6/1/7/4/4/3/617443-dune-part-two-0-230-0-345-crop.jpg"
-  },
-  {
-    title: "Dune",
-    count: 7,
-    poster_url: "https://a.ltrbxd.com/resized/sm/upload/nx/8b/vs/gc/cDbNAY0KM84cxXhmj8f0dLWza3t-0-230-0-345-crop.jpg"
-  },
-  {
-    title: "Mission: Impossible III",
-    count: 5,
-    poster_url: "https://a.ltrbxd.com/resized/film-poster/5/1/2/0/4/51204-mission-impossible-iii-0-230-0-345-crop.jpg"
-  },
-  {
-    title: "Past Lives",
-    count: 4,
-    poster_url: "https://a.ltrbxd.com/resized/film-poster/5/9/1/0/5/3/591053-past-lives-0-230-0-345-crop.jpg"
-  },
-  {
-    title: "Sicario: Day of the Soldado",
-    count: 3,
-    poster_url: "https://a.ltrbxd.com/resized/film-poster/3/3/5/2/9/4/335294-sicario-day-of-the-soldado-0-230-0-345-crop.jpg"
-  },
-]
-
-const mostWatchedMoviesConfig = {
-  count: { label: "Watch Count" },
-} satisfies ChartConfig
-
-// 10. Favorite Themes Data
-const favoriteThemesData = [
-  { theme: "epic_heroes", count: 187 },
-  { theme: "intense_thrillers", count: 156 },
-  { theme: "emotional_drama", count: 134 },
-  { theme: "scifi_adventure", count: 98 },
-]
-
-const favoriteThemesAltData = [
-  { theme: "romantic_stories", count: 76 },
-  { theme: "horror_supernatural", count: 54 },
-  { theme: "comedy_humor", count: 43 },
-]
-
-const favoriteThemesConfig = {
-  epic_heroes: { label: "Epic Heroes", color: "var(--color-theme-1)" },
-  intense_thrillers: { label: "Intense Thrillers", color: "var(--color-theme-2)" },
-  emotional_drama: { label: "Emotional Drama", color: "var(--color-theme-3)" },
-  scifi_adventure: { label: "Sci-Fi Adventure", color: "var(--color-theme-4)" },
-  romantic_stories: { label: "Romantic Stories", color: "var(--color-theme-5)" },
-  horror_supernatural: { label: "Horror & Supernatural", color: "var(--color-theme-6)" },
-  comedy_humor: { label: "Comedy & Humor", color: "var(--color-theme-7)" },
-} satisfies ChartConfig
-
-// 11. Top Production Countries Data
-const topCountriesData = [
-  { country: "usa", count: 567 },
-  { country: "uk", count: 145 },
-  { country: "france", count: 89 },
-  { country: "japan", count: 67 },
-]
-
-const topCountriesAltData = [
-  { country: "south_korea", count: 54 },
-  { country: "germany", count: 43 },
-  { country: "italy", count: 38 },
-]
-
-const topCountriesConfig = {
-  usa: { label: "United States", color: "var(--color-country-1)" },
-  uk: { label: "United Kingdom", color: "var(--color-country-2)" },
-  france: { label: "France", color: "var(--color-country-3)" },
-  japan: { label: "Japan", color: "var(--color-country-4)" },
-  south_korea: { label: "South Korea", color: "var(--color-country-5)" },
-  germany: { label: "Germany", color: "var(--color-country-6)" },
-  italy: { label: "Italy", color: "var(--color-country-7)" },
-} satisfies ChartConfig
-
-// 12. Movies for Carousel (Tops and Flops)
-const movies: any[] = [{
-    'movie_title_formatted': 'sicario-day-of-the-soldado',
-    'movie_title': 'Sicario: Day of the Soldado',
-    'type': 'movie',
-    'year_released': 2018,
-    'imdb_link': 'http://www.imdb.com/title/tt5052474/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/400535/',
-    'imdb_id': 'tt5052474',
-    'tmdb_id': '400535',
-    'lb_rating': '3.2',
-    'histogram': {
-        '1.0': 492,
-        '2.0': 1368,
-        '3.0': 1940,
-        '4.0': 7368,
-        '5.0': 11509,
-        '6.0': 29427,
-        '7.0': 26942,
-        '8.0': 17475,
-        '9.0': 2922,
-        '10.0': 2512,
-        'fans': 68,
-        'lb_rating': '3.2',
-        'total': 101955
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/3/3/5/2/9/4/335294-sicario-day-of-the-soldado-0-230-0-345-crop.jpg',
-    'genres': ['Action', 'Crime', 'Thriller'],
-    'production_countries': ['United States of America'],
-    'spoken_languages': ['English', 'Español'],
-    'popularity': 63.776,
-    'overview': 'Agent Matt Graver teams up with operative Alejandro Gillick to prevent Mexican drug cartels from smuggling terrorists across the United States border.',
-    'runtime': 122,
-    'vote_average': 6.918,
-    'vote_count': 3393,
-    'release_date': '2018-06-27',
-    'original_language': 'en',
-    'themes': ['High speed and special ops', 'Politics and human rights', 'Crime, drugs and gangsters', 'Intense political and terrorist thrillers', 'Exciting spy thrillers with tense intrigue', 'Violent action, guns, and crime', 'Explosive and action-packed heroes vs. villains', 'Violent crime and drugs'],
-    'nanogenres': ['Terrorism, Government, Cia', 'Thriller, Unpredictable, Unexpected', 'Powerful, Storytelling, Complexity', 'Violence, Dark, Unexpected', 'Friendship, Realism, Dangerous', 'Thriller, Terror, Dark', 'Villain, Bullets, Criminal', 'Terrorism, Attacks, Bombing', 'Villain, Cliche, Action-Packed', 'Killing, Shootings, Extreme']
-}, {
-    'movie_title_formatted': 'mission-impossible-iii',
-    'movie_title': 'Mission: Impossible III',
-    'type': 'movie',
-    'year_released': 2006,
-    'imdb_link': 'http://www.imdb.com/title/tt0317919/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/956/',
-    'imdb_id': 'tt0317919',
-    'tmdb_id': '956',
-    'lb_rating': '3.3',
-    'histogram': {
-        '1.0': 530,
-        '2.0': 1894,
-        '3.0': 2340,
-        '4.0': 12349,
-        '5.0': 20584,
-        '6.0': 79300,
-        '7.0': 74869,
-        '8.0': 54423,
-        '9.0': 9461,
-        '10.0': 8497,
-        'fans': 136,
-        'lb_rating': '3.3',
-        'total': 264247
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/5/1/2/0/4/51204-mission-impossible-iii-0-230-0-345-crop.jpg',
-    'genres': ['Adventure', 'Action', 'Thriller'],
-    'production_countries': ['United States of America'],
-    'spoken_languages': ['Deutsch', 'English', 'Italiano', '普通话', 'Český', '广州话 / 廣州話'],
-    'popularity': 49.344,
-    'overview': 'Retired from active duty, and training recruits for the Impossible Mission Force, agent Ethan Hunt faces the toughest foe of his career: Owen Davian, an international broker of arms and information, who is as cunning as he is ruthless. Davian emerges to threaten Hunt and all that he holds dear -- including the woman Hunt loves.',
-    'runtime': 126,
-    'vote_average': 6.7,
-    'vote_count': 6497,
-    'release_date': '2006-04-25',
-    'original_language': 'en',
-    'themes': ['High speed and special ops', 'Epic heroes', 'Explosive and action-packed heroes vs. villains', 'Adrenaline-fueled action and fast cars', 'Exciting spy thrillers with tense intrigue', 'Superheroes in action-packed battles with villains', 'Intense political and terrorist thrillers'],
-    'nanogenres': ['Action, Spy, Secret', 'Tense, Explosives, Bullets', 'Fighting, Shootout, Mindless', 'Suspense, Slick, Stylish', 'Suspense, Guns, Action-Packed', 'Stunts, Bullets, Speed', 'Jokes, Guns, Cool', 'Thriller, Explosives, Danger', 'Thrills, Stunts, Villain', 'Fighting, Thrills, Violence']
-}, {
-    'movie_title_formatted': 'dune-part-two',
-    'movie_title': 'Dune: Part Two',
-    'type': 'movie',
-    'year_released': 2024,
-    'imdb_link': 'http://www.imdb.com/title/tt15239678/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/693134/',
-    'imdb_id': 'tt15239678',
-    'tmdb_id': '693134',
-    'lb_rating': '4.5',
-    'histogram': {
-        '1.0': 1415,
-        '2.0': 2279,
-        '3.0': 1593,
-        '4.0': 7662,
-        '5.0': 10964,
-        '6.0': 44282,
-        '7.0': 76174,
-        '8.0': 264286,
-        '9.0': 321268,
-        '10.0': 613673,
-        'fans': 46000,
-        'lb_rating': '4.5',
-        'total': 1343596
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/6/1/7/4/4/3/617443-dune-part-two-0-230-0-345-crop.jpg',
-    'genres': ['Science Fiction', 'Adventure'],
-    'production_countries': ['United States of America'],
-    'spoken_languages': ['English'],
-    'popularity': 1618.076,
-    'overview': 'Follow the mythic journey of Paul Atreides as he unites with Chani and the Fremen while on a path of revenge against the conspirators who destroyed his family. Facing a choice between the love of his life and the fate of the known universe, Paul endeavors to prevent a terrible future only he can foresee.',
-    'runtime': 167,
-    'vote_average': 8.3,
-    'vote_count': 3286,
-    'release_date': '2024-02-27',
-    'original_language': 'en',
-    'themes': ['Epic heroes', 'Humanity and the world around us', 'Superheroes in action-packed battles with villains', 'Action-packed space and alien sagas', 'Thought-provoking sci-fi action and future technology', 'Emotional and captivating fantasy storytelling', 'Historical battles and epic heroism'],
-    'nanogenres': ['Space, Technology, Vision', 'Action, Epic, Emotion', 'Spaceship, Explosives, Destruction', 'Planet, Humanity, Future', 'Imaginative, Breathtaking, Technology', 'Future, Thought-Provoking, Philosophical', 'Suspense, Guns, Action-Packed', 'Fighting, Evil, Exciting', 'Hero, Future, Vision', 'Combat, Swords, Weapons']
-}, {
-    'movie_title_formatted': 'dune-2021',
-    'movie_title': 'Dune',
-    'type': 'movie',
-    'year_released': 2021,
-    'imdb_link': 'http://www.imdb.com/title/tt1160419/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/438631/',
-    'imdb_id': 'tt1160419',
-    'tmdb_id': '438631',
-    'lb_rating': '3.9',
-    'histogram': {
-        '1.0': 7586,
-        '2.0': 21709,
-        '3.0': 10826,
-        '4.0': 65934,
-        '5.0': 57377,
-        '6.0': 252563,
-        '7.0': 281523,
-        '8.0': 695835,
-        '9.0': 333093,
-        '10.0': 382719,
-        'fans': 22000,
-        'lb_rating': '3.9',
-        'total': 2109165
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/sm/upload/nx/8b/vs/gc/cDbNAY0KM84cxXhmj8f0dLWza3t-0-230-0-345-crop.jpg',
-    'genres': ['Science Fiction', 'Adventure'],
-    'production_countries': ['United States of America'],
-    'spoken_languages': ['普通话', 'English'],
-    'popularity': 535.213,
-    'overview': "Paul Atreides, a brilliant and gifted young man born into a great destiny beyond his understanding, must travel to the most dangerous planet in the universe to ensure the future of his family and his people. As malevolent forces explode into conflict over the planet's exclusive supply of the most precious resource in existence-a commodity capable of unlocking humanity's greatest potential-only those who can conquer their fear will survive.",
-    'runtime': 155,
-    'vote_average': 7.789,
-    'vote_count': 11363,
-    'release_date': '2021-09-15',
-    'original_language': 'en',
-    'themes': ['Epic heroes', 'Monsters, aliens, sci-fi and the apocalypse', 'Action-packed space and alien sagas', 'Thought-provoking sci-fi action and future technology', 'Superheroes in action-packed battles with villains', 'Imaginative space odysseys and alien encounters', 'Emotional and captivating fantasy storytelling'],
-    'nanogenres': ['Space, Technology, Vision', 'Action, Epic, Emotion', 'Spaceship, Explosives, Destruction', 'Fighting, Killing, Evil', 'Explosives, Cool, Exciting', 'Cool, Monster, Darkness', 'Battle, Destruction, Weapons', 'Weird, Chilling, Mystery', 'Graphics, Anticipation, Creativity', 'Predictable, Wins, Gorgeous']
-}, {
-    'movie_title_formatted': 'dune-part-two',
-    'movie_title': 'Dune: Part Two',
-    'type': 'movie',
-    'year_released': 2024,
-    'imdb_link': 'http://www.imdb.com/title/tt15239678/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/693134/',
-    'imdb_id': 'tt15239678',
-    'tmdb_id': '693134',
-    'lb_rating': '4.5',
-    'histogram': {
-        '1.0': 1415,
-        '2.0': 2279,
-        '3.0': 1593,
-        '4.0': 7662,
-        '5.0': 10964,
-        '6.0': 44282,
-        '7.0': 76174,
-        '8.0': 264286,
-        '9.0': 321268,
-        '10.0': 613673,
-        'fans': 46000,
-        'lb_rating': '4.5',
-        'total': 1343596
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/6/1/7/4/4/3/617443-dune-part-two-0-230-0-345-crop.jpg',
-    'genres': ['Science Fiction', 'Adventure'],
-    'production_countries': ['United States of America'],
-    'spoken_languages': ['English'],
-    'popularity': 1618.076,
-    'overview': 'Follow the mythic journey of Paul Atreides as he unites with Chani and the Fremen while on a path of revenge against the conspirators who destroyed his family. Facing a choice between the love of his life and the fate of the known universe, Paul endeavors to prevent a terrible future only he can foresee.',
-    'runtime': 167,
-    'vote_average': 8.3,
-    'vote_count': 3286,
-    'release_date': '2024-02-27',
-    'original_language': 'en',
-    'themes': ['Epic heroes', 'Humanity and the world around us', 'Superheroes in action-packed battles with villains', 'Action-packed space and alien sagas', 'Thought-provoking sci-fi action and future technology', 'Emotional and captivating fantasy storytelling', 'Historical battles and epic heroism'],
-    'nanogenres': ['Space, Technology, Vision', 'Action, Epic, Emotion', 'Spaceship, Explosives, Destruction', 'Planet, Humanity, Future', 'Imaginative, Breathtaking, Technology', 'Future, Thought-Provoking, Philosophical', 'Suspense, Guns, Action-Packed', 'Fighting, Evil, Exciting', 'Hero, Future, Vision', 'Combat, Swords, Weapons']
-}, {
-    'movie_title_formatted': 'dune-2021',
-    'movie_title': 'Dune',
-    'type': 'movie',
-    'year_released': 2021,
-    'imdb_link': 'http://www.imdb.com/title/tt1160419/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/438631/',
-    'imdb_id': 'tt1160419',
-    'tmdb_id': '438631',
-    'lb_rating': '3.9',
-    'histogram': {
-        '1.0': 7586,
-        '2.0': 21709,
-        '3.0': 10826,
-        '4.0': 65934,
-        '5.0': 57377,
-        '6.0': 252563,
-        '7.0': 281523,
-        '8.0': 695835,
-        '9.0': 333093,
-        '10.0': 382719,
-        'fans': 22000,
-        'lb_rating': '3.9',
-        'total': 2109165
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/sm/upload/nx/8b/vs/gc/cDbNAY0KM84cxXhmj8f0dLWza3t-0-230-0-345-crop.jpg',
-    'genres': ['Science Fiction', 'Adventure'],
-    'production_countries': ['United States of America'],
-    'spoken_languages': ['普通话', 'English'],
-    'popularity': 535.213,
-    'overview': "Paul Atreides, a brilliant and gifted young man born into a great destiny beyond his understanding, must travel to the most dangerous planet in the universe to ensure the future of his family and his people. As malevolent forces explode into conflict over the planet's exclusive supply of the most precious resource in existence-a commodity capable of unlocking humanity's greatest potential-only those who can conquer their fear will survive.",
-    'runtime': 155,
-    'vote_average': 7.789,
-    'vote_count': 11363,
-    'release_date': '2021-09-15',
-    'original_language': 'en',
-    'themes': ['Epic heroes', 'Monsters, aliens, sci-fi and the apocalypse', 'Action-packed space and alien sagas', 'Thought-provoking sci-fi action and future technology', 'Superheroes in action-packed battles with villains', 'Imaginative space odysseys and alien encounters', 'Emotional and captivating fantasy storytelling'],
-    'nanogenres': ['Space, Technology, Vision', 'Action, Epic, Emotion', 'Spaceship, Explosives, Destruction', 'Fighting, Killing, Evil', 'Explosives, Cool, Exciting', 'Cool, Monster, Darkness', 'Battle, Destruction, Weapons', 'Weird, Chilling, Mystery', 'Graphics, Anticipation, Creativity', 'Predictable, Wins, Gorgeous']
-}, {
-    'movie_title_formatted': 'past-lives',
-    'movie_title': 'Past Lives',
-    'type': 'movie',
-    'year_released': 2023,
-    'imdb_link': 'http://www.imdb.com/title/tt13238346/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/666277/',
-    'imdb_id': 'tt13238346',
-    'tmdb_id': '666277',
-    'lb_rating': '4.2',
-    'histogram': {
-        '1.0': 1219,
-        '2.0': 2546,
-        '3.0': 2120,
-        '4.0': 10840,
-        '5.0': 14942,
-        '6.0': 59817,
-        '7.0': 93778,
-        '8.0': 259379,
-        '9.0': 180620,
-        '10.0': 248161,
-        'fans': 23000,
-        'lb_rating': '4.2',
-        'total': 873422
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/5/9/1/0/5/3/591053-past-lives-0-230-0-345-crop.jpg',
-    'genres': ['Drama', 'Romance'],
-    'production_countries': ['South Korea', 'United States of America'],
-    'spoken_languages': ['English', '한국어/조선말'],
-    'popularity': 93.056,
-    'overview': 'Nora and Hae Sung, two childhood friends, are reunited in New York for one fateful week as they confront notions of destiny, love, and the choices that make a life.',
-    'runtime': 106,
-    'vote_average': 7.798,
-    'vote_count': 1239,
-    'release_date': '2023-06-02',
-    'original_language': 'en',
-    'themes': ['Moving relationship stories', 'Touching and sentimental family stories', 'Powerful stories of heartbreak and suffering', 'Captivating relationships and charming romance', 'Tragic sadness and captivating beauty', 'Passion and romance'],
-    'nanogenres': ['Feelings, Moving, Crying', 'Drama, Cry, Endearing', 'Touching, Chemistry, Marriage', 'Romance, Sympathy, Desire', 'Relationships, Storytelling, Complexity', 'Relationships, Friendship, Sweet', 'Touching, Beauty, Desire', 'Powerful, Loving, Sentimental', 'Cry, Confused, Child', 'Charming, Magic, Dream']
-}, {
-    'movie_title_formatted': 'the-talented-mr-ripley',
-    'movie_title': 'The Talented Mr. Ripley',
-    'type': 'movie',
-    'year_released': 1999,
-    'imdb_link': 'http://www.imdb.com/title/tt0134119/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/1213/',
-    'imdb_id': 'tt0134119',
-    'tmdb_id': '1213',
-    'lb_rating': '3.8',
-    'histogram': {
-        '1.0': 414,
-        '2.0': 1215,
-        '3.0': 1222,
-        '4.0': 6486,
-        '5.0': 9562,
-        '6.0': 41864,
-        '7.0': 65258,
-        '8.0': 108969,
-        '9.0': 37067,
-        '10.0': 32404,
-        'fans': 4800,
-        'lb_rating': '3.8',
-        'total': 304461
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/5/1/1/3/8/51138-the-talented-mr-ripley-0-230-0-345-crop.jpg',
-    'genres': ['Thriller', 'Crime', 'Drama'],
-    'production_countries': ['United States of America'],
-    'spoken_languages': ['English', 'Italiano'],
-    'popularity': 37.922,
-    'overview': "Tom Ripley is a calculating young man who believes it's better to be a fake somebody than a real nobody. Opportunity knocks in the form of a wealthy U.S. shipbuilder who hires Tom to travel to Italy to bring back his playboy son, Dickie. Ripley worms his way into the idyllic lives of Dickie and his girlfriend, plunging into a daring scheme of duplicity, lies and murder.",
-    'runtime': 139,
-    'vote_average': 7.188,
-    'vote_count': 3482,
-    'release_date': '1999-12-25',
-    'original_language': 'en',
-    'themes': ['Intense violence and sexual transgression', 'Humanity and the world around us', 'Thrillers and murder mysteries', 'Twisted dark psychological thriller', 'Intriguing and suspenseful murder mysteries', 'Suspenseful crime thrillers', 'Captivating relationships and charming romance', 'Noir and dark crime dramas'],
-    'nanogenres': ['Weird, Disturbing, Intriguing', 'Suspense, Unexpected, Engaging', 'Murderer, Compelling, Sympathy', 'Romance, Sensitive, Lonely', 'Thriller, Psychotic, Dark', 'Suspense, Criminal, Film-Noir', 'Victim, Tense, Detective', 'Drama, Gripping, Vulnerable', 'Murder, Frighten, Mysterious', 'Detective, Twisted, Disturbed']
-}, {
-    'movie_title_formatted': 'joker-2019',
-    'movie_title': 'Joker',
-    'type': 'movie',
-    'year_released': 2019,
-    'imdb_link': 'http://www.imdb.com/title/tt7286456/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/475557/',
-    'imdb_id': 'tt7286456',
-    'tmdb_id': '475557',
-    'lb_rating': '3.8',
-    'histogram': {
-        '1.0': 9828,
-        '2.0': 25508,
-        '3.0': 16395,
-        '4.0': 86737,
-        '5.0': 73912,
-        '6.0': 334163,
-        '7.0': 306361,
-        '8.0': 822871,
-        '9.0': 298212,
-        '10.0': 596197,
-        'fans': 22000,
-        'lb_rating': '3.8',
-        'total': 2570184
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/4/0/6/7/7/5/406775-joker-0-230-0-345-crop.jpg',
-    'genres': ['Crime', 'Thriller', 'Drama'],
-    'production_countries': ['Canada', 'United States of America'],
-    'spoken_languages': ['English'],
-    'popularity': 312.884,
-    'overview': 'During the 1980s, a failed stand-up comedian is driven insane and turns to a life of crime and chaos in Gotham City while becoming an infamous psychopathic crime figure.',
-    'runtime': 122,
-    'vote_average': 8.161,
-    'vote_count': 24452,
-    'release_date': '2019-10-01',
-    'original_language': 'en',
-    'themes': ['Intense violence and sexual transgression', 'Moving relationship stories', 'Humanity and the world around us', 'Crime, drugs and gangsters', 'Powerful stories of heartbreak and suffering', 'Gripping, intense violent crime', 'Challenging or sexual themes & twists', 'Emotional and captivating fantasy storytelling', 'Graphic violence and brutal revenge'],
-    'nanogenres': ['Comic-Book, Hero, Exciting', 'Gory, Brutal, Extreme', 'Terrifying, Disturbed, Troubled', 'Chilling, Fear, Extreme', 'Shootings, Troubled, Confused', 'Emotion, Insanity, Mentally', 'Tense, Captivating, Unpredictable', 'Bloody, Dark, Intense', 'Intense, Storytelling, Compelling', 'Emotional, Madness, Sympathy']
-}, {
-    'movie_title_formatted': 'the-social-network',
-    'movie_title': 'The Social Network',
-    'type': 'movie',
-    'year_released': 2010,
-    'imdb_link': 'http://www.imdb.com/title/tt1285016/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/37799/',
-    'imdb_id': 'tt1285016',
-    'tmdb_id': '37799',
-    'lb_rating': '4.0',
-    'histogram': {
-        '1.0': 2701,
-        '2.0': 9573,
-        '3.0': 5307,
-        '4.0': 44698,
-        '5.0': 36360,
-        '6.0': 226230,
-        '7.0': 197799,
-        '8.0': 480848,
-        '9.0': 200002,
-        '10.0': 306040,
-        'fans': 30000,
-        'lb_rating': '4.0',
-        'total': 1509558
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/sm/upload/nw/cm/pa/ai/sGQv3ZMZBDBnl3z42Q0mEQ5uiDe-0-230-0-345-crop.jpg',
-    'genres': ['Drama'],
-    'production_countries': ['United States of America'],
-    'spoken_languages': ['English'],
-    'popularity': 53.328,
-    'overview': 'In 2003, Harvard undergrad and computer genius Mark Zuckerberg begins work on a new concept that eventually turns into the global social network known as Facebook. Six years later, he is one of the youngest billionaires ever, but Zuckerberg finds that his unprecedented success leads to both personal and legal complications when he ends up on the receiving end of two lawsuits, one involving his former friend.',
-    'runtime': 121,
-    'vote_average': 7.364,
-    'vote_count': 11653,
-    'release_date': '2010-10-01',
-    'original_language': 'en',
-    'themes': ['Humanity and the world around us', 'Teen school antics and laughter', 'Student coming-of-age challenges', 'Fascinating, emotional stories and documentaries'],
-    'nanogenres': ['Geeks, Technology, Excitement', 'Relationships, Geeks, Obsession', 'Emotional, Biography, Facts', 'Cliche, College, School', 'College, Nerds, Silly', 'College, Girlfriend, Lesson', 'Drama, Sympathy, Complicated', 'Humor, Geeks, Cool', 'Friendship, Captivating, Soul', 'Cool, Intelligent, Stereotype']
-}, {
-    'movie_title_formatted': 'oppenheimer-2023',
-    'movie_title': 'Oppenheimer',
-    'type': 'movie',
-    'year_released': 2023,
-    'imdb_link': 'http://www.imdb.com/title/tt15398776/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/872585/',
-    'imdb_id': 'tt15398776',
-    'tmdb_id': '872585',
-    'lb_rating': '4.2',
-    'histogram': {
-        '1.0': 4333,
-        '2.0': 9102,
-        '3.0': 5467,
-        '4.0': 31577,
-        '5.0': 32688,
-        '6.0': 146631,
-        '7.0': 181551,
-        '8.0': 542159,
-        '9.0': 446328,
-        '10.0': 678678,
-        'fans': 31000,
-        'lb_rating': '4.2',
-        'total': 2078514
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/7/8/4/3/2/8/784328-oppenheimer-0-230-0-345-crop.jpg',
-    'genres': ['Drama', 'History'],
-    'production_countries': ['United Kingdom', 'United States of America'],
-    'spoken_languages': ['Nederlands', 'English'],
-    'popularity': 477.921,
-    'overview': "The story of J. Robert Oppenheimer's role in the development of the atomic bomb during World War II.",
-    'runtime': 181,
-    'vote_average': 8.108,
-    'vote_count': 7733,
-    'release_date': '2023-07-19',
-    'original_language': 'en',
-    'themes': ['Humanity and the world around us', 'Politics and human rights', 'Epic history and literature', 'Intense political and terrorist thrillers', 'Riveting political and presidential drama', 'Dangerous technology and the apocalypse', 'Surreal and thought-provoking visions of life and death', 'Political drama, patriotism, and war'],
-    'nanogenres': ['Intelligent, Thought-Provoking, Philosophical', 'Moving, Struggles, Riveting', 'Scientific, Thought-Provoking, Philosophy', 'Tear-Jerker, Breathtaking, Captivating', 'England, Civilian, Gripping', 'Touching, Historic, Nation', 'Reality, Revelation, Intellectual', 'Emotion, Humanity, Complexity', 'Thought-Provoking, Moral, Intellectual', 'Intense, Revelation, Fascinating']
-}, {
-    'movie_title_formatted': 'the-prestige',
-    'movie_title': 'The Prestige',
-    'type': 'movie',
-    'year_released': 2006,
-    'imdb_link': 'http://www.imdb.com/title/tt0482571/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/1124/',
-    'imdb_id': 'tt0482571',
-    'tmdb_id': '1124',
-    'lb_rating': '4.2',
-    'histogram': {
-        '1.0': 847,
-        '2.0': 2232,
-        '3.0': 1787,
-        '4.0': 10193,
-        '5.0': 12243,
-        '6.0': 63499,
-        '7.0': 95556,
-        '8.0': 275349,
-        '9.0': 187111,
-        '10.0': 227180,
-        'fans': 22000,
-        'lb_rating': '4.2',
-        'total': 875997
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/5/1/1/4/7/51147-the-prestige-0-230-0-345-crop.jpg',
-    'genres': ['Drama', 'Mystery', 'Science Fiction'],
-    'production_countries': ['United Kingdom', 'United States of America'],
-    'spoken_languages': ['English'],
-    'popularity': 80.535,
-    'overview': 'A mysterious story of two magicians whose intense rivalry leads them on a life-long battle for supremacy -- full of obsession, deceit and jealousy with dangerous and deadly consequences.',
-    'runtime': 130,
-    'vote_average': 8.2,
-    'vote_count': 15386,
-    'release_date': '2006-10-19',
-    'original_language': 'en',
-    'themes': ['Thrillers and murder mysteries', 'Twisted dark psychological thriller', 'Intriguing and suspenseful murder mysteries', 'Intense political and terrorist thrillers'],
-    'nanogenres': ['Dark, Storytelling, Captivating', 'Twist, Intriguing, Confusion', 'Twist, Sinister, Secret', 'Thriller, Climax, Riveting', 'Guessing, Thought-Provoking, Confusion', 'Tense, Mysterious, Solving', 'Suspense, Confused, Discover', 'Chemistry, Storytelling, Lover', 'Killing, Twist, Confused', 'Dark, Desire, Twisted']
-}, {
-    'movie_title_formatted': 'mission-impossible-dead-reckoning-part-one',
-    'movie_title': 'Mission: Impossible – Dead Reckoning Part One',
-    'type': 'movie',
-    'year_released': 2023,
-    'imdb_link': 'http://www.imdb.com/title/tt9603212/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/575264/',
-    'imdb_id': 'tt9603212',
-    'tmdb_id': '575264',
-    'lb_rating': '3.7',
-    'histogram': {
-        '1.0': 1075,
-        '2.0': 2636,
-        '3.0': 2681,
-        '4.0': 11583,
-        '5.0': 17897,
-        '6.0': 62032,
-        '7.0': 95365,
-        '8.0': 162992,
-        '9.0': 62763,
-        '10.0': 39657,
-        'fans': 636,
-        'lb_rating': '3.7',
-        'total': 458681
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/5/0/3/4/0/2/503402-mission-impossible-dead-reckoning-part-one-0-230-0-345-crop.jpg',
-    'genres': ['Action', 'Thriller'],
-    'production_countries': ['United States of America'],
-    'spoken_languages': ['Français', 'English', 'Italiano', 'Pусский'],
-    'popularity': 171.482,
-    'overview': "Ethan Hunt and his IMF team embark on their most dangerous mission yet: To track down a terrifying new weapon that threatens all of humanity before it falls into the wrong hands. With control of the future and the world's fate at stake and dark forces from Ethan's past closing in, a deadly race around the globe begins. Confronted by a mysterious, all-powerful enemy, Ethan must consider that nothing can matter more than his mission—not even the lives of those he cares about most.",
-    'runtime': 164,
-    'vote_average': 7.55,
-    'vote_count': 3342,
-    'release_date': '2023-07-08',
-    'original_language': 'en',
-    'themes': ['High speed and special ops', 'Epic heroes', 'Explosive and action-packed heroes vs. villains', 'Adrenaline-fueled action and fast cars', 'Superheroes in action-packed battles with villains', 'Exciting spy thrillers with tense intrigue', 'Heists and thrilling action'],
-    'nanogenres': ['Action, Spy, Secret', 'Gadgets, Stunts, Agent', 'Fighting, Cool, Menacing', 'Thriller, Explosives, Danger', 'Jokes, Guns, Cool', 'Death, Stunts, Formulaic', 'Action, Thrills, Shootings', 'Thrills, Stunts, Villain', 'Stunts, Cars, Chasing', 'Villain, Cool, Chases']
-}, {
-    'movie_title_formatted': 'avatar-the-way-of-water',
-    'movie_title': 'Avatar: The Way of Water',
-    'type': 'movie',
-    'year_released': 2022,
-    'imdb_link': 'http://www.imdb.com/title/tt1630029/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/76600/',
-    'imdb_id': 'tt1630029',
-    'tmdb_id': '76600',
-    'lb_rating': '3.6',
-    'histogram': {
-        '1.0': 8013,
-        '2.0': 18840,
-        '3.0': 13763,
-        '4.0': 59089,
-        '5.0': 63137,
-        '6.0': 201025,
-        '7.0': 206460,
-        '8.0': 339319,
-        '9.0': 127502,
-        '10.0': 186852,
-        'fans': 6300,
-        'lb_rating': '3.6',
-        'total': 1224000
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/6/3/0/5/8/63058-avatar-the-way-of-water-0-230-0-345-crop.jpg',
-    'genres': ['Science Fiction', 'Adventure', 'Action'],
-    'production_countries': ['United States of America'],
-    'spoken_languages': ['English'],
-    'popularity': 204.651,
-    'overview': 'Set more than a decade after the events of the first film, learn the story of the Sully family (Jake, Neytiri, and their kids), the trouble that follows them, the lengths they go to keep each other safe, the battles they fight to stay alive, and the tragedies they endure.',
-    'runtime': 192,
-    'vote_average': 7.626,
-    'vote_count': 11200,
-    'release_date': '2022-12-14',
-    'original_language': 'en',
-    'themes': ['Monsters, aliens, sci-fi and the apocalypse', 'Epic heroes', 'Thought-provoking sci-fi action and future technology', 'Superheroes in action-packed battles with villains', 'Epic adventure and breathtaking battles', 'Emotional and captivating fantasy storytelling', 'Action-packed space and alien sagas'],
-    'nanogenres': ['Emotional, Child, Wild', 'Tear-Jerker, Humans, Environment', 'Tear-Jerker, Magic, Captivating', 'Excitement, Engaging, Danger', 'Cry, Family, Environment', 'Touching, Breathtaking, Beauty', 'Touching, Tragic, Humanity', 'Action, Epic, Emotion', 'Action, Creature, Graphics', 'Adventure, Graphics, Fantasy']
-}, {
-    'movie_title_formatted': 'creed-iii',
-    'movie_title': 'Creed III',
-    'type': 'movie',
-    'year_released': 2023,
-    'imdb_link': 'http://www.imdb.com/title/tt11145118/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/677179/',
-    'imdb_id': 'tt11145118',
-    'tmdb_id': '677179',
-    'lb_rating': '3.5',
-    'histogram': {
-        '1.0': 484,
-        '2.0': 1474,
-        '3.0': 1945,
-        '4.0': 9026,
-        '5.0': 16345,
-        '6.0': 54712,
-        '7.0': 69333,
-        '8.0': 74733,
-        '9.0': 19099,
-        '10.0': 14133,
-        'fans': 329,
-        'lb_rating': '3.5',
-        'total': 261284
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/6/0/1/6/2/4/601624-creed-iii-0-230-0-345-crop.jpg',
-    'genres': ['Drama', 'Action'],
-    'production_countries': ['United States of America'],
-    'spoken_languages': ['Español', 'English'],
-    'popularity': 128.241,
-    'overview': 'After dominating the boxing world, Adonis Creed has thrived in his career and family life. When a childhood friend and former boxing prodigy, Damian Anderson, resurfaces after serving a long sentence in prison, he is eager to prove that he deserves his shot in the ring. The face-off between former friends is more than just a fight. To settle the score, Adonis must put his future on the line to battle Damian — a fighter with nothing to lose.',
-    'runtime': 116,
-    'vote_average': 7.125,
-    'vote_count': 2323,
-    'release_date': '2023-03-01',
-    'original_language': 'en',
-    'themes': ['Moving relationship stories', 'Underdog fighting and boxing stories'],
-    'nanogenres': ['Boxing, Emotional, Sports', 'Fighter, Intense, Fought', 'Relationships, Dream, Desire', 'Predictable, Wins, Gorgeous', 'Compelling, Glory, Beloved', 'Fighter, Gritty, Wins', 'Cliche, Fighter, Flashy', 'Brutal, Battle, Fists', 'Feelings, Tragic, Anger', 'Touching, Storytelling, Flashy']
-}, {
-    'movie_title_formatted': 'babylon-2022',
-    'movie_title': 'Babylon',
-    'type': 'movie',
-    'year_released': 2022,
-    'imdb_link': 'http://www.imdb.com/title/tt10640346/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/615777/',
-    'imdb_id': 'tt10640346',
-    'tmdb_id': '615777',
-    'lb_rating': '3.8',
-    'histogram': {
-        '1.0': 3264,
-        '2.0': 7172,
-        '3.0': 5782,
-        '4.0': 21624,
-        '5.0': 24907,
-        '6.0': 69904,
-        '7.0': 88239,
-        '8.0': 165400,
-        '9.0': 99495,
-        '10.0': 109573,
-        'fans': 16000,
-        'lb_rating': '3.8',
-        'total': 595360
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/5/4/2/7/7/3/542773-babylon-0-230-0-345-crop.jpg',
-    'genres': ['Drama', 'Comedy'],
-    'production_countries': ['United States of America'],
-    'spoken_languages': ['广州话 / 廣州話', 'English', 'Español'],
-    'popularity': 235.223,
-    'overview': "A tale of outsized ambition and outrageous excess, tracing the rise and fall of multiple characters in an era of unbridled decadence and depravity during Hollywood's transition from silent films to sound films in the late 1920s.",
-    'runtime': 189,
-    'vote_average': 7.411,
-    'vote_count': 2763,
-    'release_date': '2022-12-22',
-    'original_language': 'en',
-    'themes': ['Humanity and the world around us', 'Moving relationship stories', 'Emotional life of renowned artists'],
-    'nanogenres': ['Emotion, Sexual, Passionate', 'Drugs, Depressing, Raw', 'Sexual, Weird, Genius', 'Hilarious, Sexual, Naked', 'Tear-Jerker, Beauty, Happiness', 'Emotion, Captivating, Desire', 'Chemistry, Gorgeous, Magic', 'Hilarious, Nudity, Fame', 'Emotion, Discover, Overcome', 'Predictable, Sadness, Crying']
-}, {
-    'movie_title_formatted': 'mr-mme-adelman',
-    'movie_title': 'Mr & Mme Adelman',
-    'type': 'movie',
-    'year_released': 2017,
-    'imdb_link': 'http://www.imdb.com/title/tt6095616/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/431937/',
-    'imdb_id': 'tt6095616',
-    'tmdb_id': '431937',
-    'lb_rating': '3.7',
-    'histogram': {
-        '1.0': 27,
-        '2.0': 55,
-        '3.0': 46,
-        '4.0': 190,
-        '5.0': 290,
-        '6.0': 873,
-        '7.0': 1276,
-        '8.0': 2115,
-        '9.0': 696,
-        '10.0': 969,
-        'fans': 162,
-        'lb_rating': '3.7',
-        'total': 6537
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/3/6/5/0/7/0/365070-mr-mme-adelman-0-230-0-345-crop.jpg',
-    'themes': [],
-    'nanogenres': [],
-    'genres': ['Romance', 'Drama', 'Comedy'],
-    'production_countries': ['Belgium', 'France'],
-    'spoken_languages': ['Français'],
-    'popularity': 19.138,
-    'overview': "How did Sarah and Victor get along for more than 45 years? Who was this enigmatic woman living in the shadow of her husband? Love, ambition, betrayals and secrets feed the story of this extraordinary couple, as they experience both the large and small moments of the last century's history.",
-    'runtime': 120,
-    'vote_average': 7.5,
-    'vote_count': 425,
-    'release_date': '2017-03-08',
-    'original_language': 'fr',
-}, {
-    'movie_title_formatted': 'lord-of-war',
-    'movie_title': 'Lord of War',
-    'type': 'movie',
-    'year_released': 2005,
-    'imdb_link': 'http://www.imdb.com/title/tt0399295/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/1830/',
-    'imdb_id': 'tt0399295',
-    'tmdb_id': '1830',
-    'lb_rating': '3.6',
-    'histogram': {
-        '1.0': 277,
-        '2.0': 767,
-        '3.0': 984,
-        '4.0': 4348,
-        '5.0': 6981,
-        '6.0': 24575,
-        '7.0': 31914,
-        '8.0': 33542,
-        '9.0': 7693,
-        '10.0': 6359,
-        'fans': 379,
-        'lb_rating': '3.6',
-        'total': 117440
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/5/0/7/6/9/50769-lord-of-war-0-230-0-345-crop.jpg',
-    'genres': ['Crime', 'Drama', 'Thriller'],
-    'production_countries': ['France', 'United States of America', 'Germany'],
-    'spoken_languages': ['العربية', 'Deutsch', 'English', 'Français', 'Pусский', 'Español', 'Український', 'Türkçe'],
-    'popularity': 29.464,
-    'overview': "Yuri Orlov is a globetrotting arms dealer and, through some of the deadliest war zones, he struggles to stay one step ahead of a relentless Interpol agent, his business rivals and even some of his customers who include many of the world's most notorious dictators. Finally, he must also face his own conscience.",
-    'runtime': 122,
-    'vote_average': 7.31,
-    'vote_count': 4544,
-    'release_date': '2005-09-16',
-    'original_language': 'en',
-    'themes': ['Politics and human rights', 'Crime, drugs and gangsters', 'Intense violence and sexual transgression', 'Intense political and terrorist thrillers', 'Gritty crime and ruthless gangsters', 'Riveting political and presidential drama', 'Violent crime and drugs', 'Racism and the powerful fight for justice'],
-    'nanogenres': ['Addiction, Moral, Society', 'Drama, Morality, Cynical', 'Shootings, Firearms, Weapons', 'Violence, Guns, Dangerous', 'Crime, Government, Moving', 'Anti-War, Enemies, Fighter', 'Thriller, Guns, Exciting', 'Gangster, Class, Crazy', 'Gangster, Violence, Drama', 'Blood, Exciting, Deadly']
-}, {
-    'movie_title_formatted': 'the-menu-2022',
-    'movie_title': 'The Menu',
-    'type': 'movie',
-    'year_released': 2022,
-    'imdb_link': 'http://www.imdb.com/title/tt9764362/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/593643/',
-    'imdb_id': 'tt9764362',
-    'tmdb_id': '593643',
-    'lb_rating': '3.5',
-    'histogram': {
-        '1.0': 4959,
-        '2.0': 16108,
-        '3.0': 13302,
-        '4.0': 73847,
-        '5.0': 84471,
-        '6.0': 323303,
-        '7.0': 344505,
-        '8.0': 515892,
-        '9.0': 134174,
-        '10.0': 155505,
-        'fans': 4700,
-        'lb_rating': '3.5',
-        'total': 1666066
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/5/2/1/3/2/3/521323-the-menu-0-230-0-345-crop.jpg',
-    'genres': ['Comedy', 'Thriller', 'Horror'],
-    'production_countries': ['United States of America'],
-    'spoken_languages': ['English', 'Español'],
-    'popularity': 82.161,
-    'overview': 'A young couple travels to a remote island to eat at an exclusive restaurant where the chef has prepared a lavish menu, with some shocking surprises.',
-    'runtime': 107,
-    'vote_average': 7.192,
-    'vote_count': 4342,
-    'release_date': '2022-11-17',
-    'original_language': 'en',
-    'themes': ['Intense violence and sexual transgression', 'Humanity and the world around us', 'Twisted dark psychological thriller', 'Terrifying, haunted, and supernatural horror'],
-    'nanogenres': ['Twist, Psychopath, Madness', 'Humor, Eating, Mocking', 'Killing, Shock, Bizarre', 'Weird, Reality, Complicated', 'Terrifying, Extreme, Confused', 'Thrills, Guessing, Intriguing', 'Gory, Disturbing, Guessing', 'Guessing, Creepy, Shock', 'Eating, Friendship, Ensemble', 'Tense, Guessing, Mysterious']
-}, {
-    'movie_title_formatted': 'glass-onion',
-    'movie_title': 'Glass Onion',
-    'type': 'movie',
-    'year_released': 2022,
-    'imdb_link': 'http://www.imdb.com/title/tt11564570/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/661374/',
-    'imdb_id': 'tt11564570',
-    'tmdb_id': '661374',
-    'lb_rating': '3.5',
-    'histogram': {
-        '1.0': 6452,
-        '2.0': 21998,
-        '3.0': 16612,
-        '4.0': 91915,
-        '5.0': 96664,
-        '6.0': 343027,
-        '7.0': 320858,
-        '8.0': 448228,
-        '9.0': 122445,
-        '10.0': 120663,
-        'fans': 1500,
-        'lb_rating': '3.5',
-        'total': 1588862
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/5/8/6/7/2/3/586723-glass-onion-a-knives-out-mystery-0-230-0-345-crop.jpg',
-    'genres': ['Comedy', 'Crime', 'Mystery'],
-    'production_countries': ['United States of America'],
-    'spoken_languages': ['English'],
-    'popularity': 84.356,
-    'overview': 'World-famous detective Benoit Blanc heads to Greece to peel back the layers of a mystery surrounding a tech billionaire and his eclectic crew of friends.',
-    'runtime': 140,
-    'vote_average': 7.044,
-    'vote_count': 5093,
-    'release_date': '2022-11-12',
-    'original_language': 'en',
-    'themes': ['Thrillers and murder mysteries', 'Intriguing and suspenseful murder mysteries', 'Suspenseful crime thrillers'],
-    'nanogenres': ['Murderer, Mysterious, Guessing', 'Killer, Crime, Suspects', 'Killer, Mysterious, Solving', 'Killing, Investigate, Twist', 'Humorous, Wit, Formulaic', 'Murderer, Clues, Convoluted', 'Delightful, Intelligent, Complicated', 'Victim, Investigate, Mysterious', 'Twist, Intriguing, Intrigue', 'Relationships, Mystery, Revelation']
-}, {
-    'movie_title_formatted': 'the-pale-blue-eye',
-    'movie_title': 'The Pale Blue Eye',
-    'type': 'movie',
-    'year_released': 2022,
-    'imdb_link': 'http://www.imdb.com/title/tt14138650/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/800815/',
-    'imdb_id': 'tt14138650',
-    'tmdb_id': '800815',
-    'lb_rating': '3.1',
-    'histogram': {
-        '1.0': 523,
-        '2.0': 1803,
-        '3.0': 2647,
-        '4.0': 12901,
-        '5.0': 21118,
-        '6.0': 46108,
-        '7.0': 30395,
-        '8.0': 19265,
-        '9.0': 3331,
-        '10.0': 4400,
-        'fans': 131,
-        'lb_rating': '3.1',
-        'total': 142491
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/7/1/8/2/4/1/718241-the-pale-blue-eye-0-230-0-345-crop.jpg',
-    'genres': ['Thriller', 'Crime', 'Horror', 'Mystery'],
-    'production_countries': ['United States of America'],
-    'spoken_languages': ['English', 'Français', 'Latin'],
-    'popularity': 25.209,
-    'overview': 'West Point, New York, 1830. When a cadet at the burgeoning military academy is found hanged with his heart cut out, the top brass summons former New York City constable Augustus Landor to investigate. While attempting to solve this grisly mystery, the reluctant detective engages the help of one of the cadets: a strange but brilliant young fellow by the name of Edgar Allan Poe.',
-    'runtime': 128,
-    'vote_average': 6.847,
-    'vote_count': 1678,
-    'release_date': '2022-12-22',
-    'original_language': 'en',
-    'themes': ['Thrillers and murder mysteries', 'Intriguing and suspenseful murder mysteries', 'Suspenseful crime thrillers', 'Twisted dark psychological thriller', 'Noir and dark crime dramas', 'Terrifying, haunted, and supernatural horror'],
-    'nanogenres': ['Killer, Detectives, Clues', 'Crime, Intriguing, Guilty', 'Tense, Mysterious, Solving', 'Spooky, Killer, Tense', 'Crime, Twist, Mysterious', 'Emotion, Complexity, Revelation', 'Suspense, Detective, Evidence', 'Death, Suspense, Dark', 'Investigate, Convoluted, Complicated', 'Murderer, Mysterious, Guessing']
-}, {
-    'movie_title_formatted': 'the-northman',
-    'movie_title': 'The Northman',
-    'type': 'movie',
-    'year_released': 2022,
-    'imdb_link': 'http://www.imdb.com/title/tt11138512/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/639933/',
-    'imdb_id': 'tt11138512',
-    'tmdb_id': '639933',
-    'lb_rating': '3.8',
-    'histogram': {
-        '1.0': 2310,
-        '2.0': 5719,
-        '3.0': 4516,
-        '4.0': 19343,
-        '5.0': 23446,
-        '6.0': 75877,
-        '7.0': 107753,
-        '8.0': 197241,
-        '9.0': 88632,
-        '10.0': 62085,
-        'fans': 2500,
-        'lb_rating': '3.8',
-        'total': 586922
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/5/6/5/8/5/2/565852-the-northman-0-230-0-345-crop.jpg',
-    'genres': ['Action', 'Adventure', 'Fantasy'],
-    'production_countries': ['China', 'United States of America'],
-    'spoken_languages': ['English', 'Íslenska'],
-    'popularity': 138.858,
-    'overview': "Prince Amleth is on the verge of becoming a man when his father is brutally murdered by his uncle, who kidnaps the boy's mother. Two decades later, Amleth is now a Viking who's on a mission to save his mother, kill his uncle and avenge his father.",
-    'runtime': 137,
-    'vote_average': 7.066,
-    'vote_count': 3986,
-    'release_date': '2022-04-07',
-    'original_language': 'en',
-    'themes': ['Epic history and literature', 'Epic heroes', 'Humanity and the world around us', 'Fantasy adventure, heroism, and swordplay', 'Captivating vision and Shakespearean drama', 'Historical battles and epic heroism', 'Epic adventure and breathtaking battles', 'Bloody vampire horror'],
-    'nanogenres': ['Hero, Evil, Complex', 'Fighting, Epic, Excitement', 'Swords, Mythology, Fantasy', 'Villain, Bloody, Battle', 'Voices, Battle, Action-Packed', 'Bloody, Action-Packed, Avenge', 'Death, Forest, Trip', 'Feelings, Complex, Captivating', 'Combat, Swords, Weapons', 'Myth, Imaginative, Quest']
-}, {
-    'movie_title_formatted': 'the-batman',
-    'movie_title': 'The Batman',
-    'type': 'movie',
-    'year_released': 2022,
-    'imdb_link': 'http://www.imdb.com/title/tt1877830/maindetails',
-    'tmdb_link': 'https://www.themoviedb.org/movie/414906/',
-    'imdb_id': 'tt1877830',
-    'tmdb_id': '414906',
-    'lb_rating': '4.0',
-    'histogram': {
-        '1.0': 4551,
-        '2.0': 15085,
-        '3.0': 8156,
-        '4.0': 55963,
-        '5.0': 47883,
-        '6.0': 240936,
-        '7.0': 255969,
-        '8.0': 685555,
-        '9.0': 359910,
-        '10.0': 482992,
-        'fans': 42000,
-        'lb_rating': '4.0',
-        'total': 2157000
-    },
-    'poster_url': 'https://a.ltrbxd.com/resized/film-poster/3/4/8/9/1/4/348914-the-batman-0-230-0-345-crop.jpg',
-    'genres': ['Crime', 'Mystery', 'Thriller'],
-    'production_countries': ['United States of America'],
-    'spoken_languages': ['English'],
-    'popularity': 184.755,
-    'overview': 'In his second year of fighting crime, Batman uncovers corruption in Gotham City that connects to his own family while facing a serial killer known as the Riddler.',
-    'runtime': 177,
-    'vote_average': 7.685,
-    'vote_count': 9462,
-    'release_date': '2022-03-01',
-    'original_language': 'en',
-    'themes': ['Crime, drugs and gangsters', 'Epic heroes', 'High speed and special ops', 'Thrillers and murder mysteries', 'Superheroes in action-packed battles with villains', 'Explosive and action-packed heroes vs. villains', 'Violent action, guns, and crime', 'Noir and dark crime dramas', 'Intriguing and suspenseful murder mysteries'],
-    'nanogenres': ['Comic-Book, Hero, Exciting', 'Fighting, Bullets, Exciting', 'Tense, Explosives, Bullets', 'Tense, Mysterious, Solving', 'Villain, Comic-Book, Campy', 'Hero, Evil, Complex', 'Villain, Stunts, Vengeance', 'Twist, Mysterious, Confusing', 'Criminal, Exciting, Climax', 'Explosives, Adventure, Predictable']
-}];
-
-
-type AdvancedUserMetricsProps = {
-  data: {
-    movies_reviewed: number;
-    shows_reviewed: number;
-    hours_watched: number;
-    number_daily_reviews_over_mean: number;
-    mean_daily_reviews: number;
-    longest_streak: number;
-  };
-  sectionTitle: string;
+const GENRE_COLORS: Record<string, string> = {
+  "Action": "#ef4444",
+  "Action & Adventure": "#f87171",
+  "Adventure": "#3b82f6",
+  "Animation": "#f97316",
+  "Comedy": "#22c55e",
+  "Crime": "#6366f1",
+  "Documentary": "#84cc16",
+  "Drama": "#8b5cf6",
+  "Family": "#34d399",
+  "Fantasy": "#06b6d4",
+  "History": "#d97706",
+  "Horror": "#dc2626",
+  "Kids": "#fb923c",
+  "Music": "#e879f9",
+  "Mystery": "#a855f7",
+  "News": "#94a3b8",
+  "Reality": "#facc15",
+  "Romance": "#ec4899",
+  "Sci-Fi & Fantasy": "#0891b2",
+  "Science Fiction": "#14b8a6",
+  "Soap": "#f9a8d4",
+  "Talk": "#a3a3a3",
+  "Thriller": "#f59e0b",
+  "TV Movie": "#475569",
+  "War": "#78716c",
+  "War & Politics": "#57534e",
+  "Western": "#b45309",
+  "Other": "#64748b",
 };
 
-export const AdvancedUserMetrics = ({ data, sectionTitle }: AdvancedUserMetricsProps) => {
+const getGenreColor = (genre: string) => GENRE_COLORS[genre] || GENRE_COLORS["Other"];
+
+const RATING_COLOR_STOPS = [
+  { at: 0,  r: 59,  g: 130, b: 246 }, // blue      (1-2)
+  { at: 4,  r: 139, g: 92,  b: 246 }, // violet    (3-4)
+  { at: 6,  r: 245, g: 158, b: 11  }, // amber     (5-6)
+  { at: 8,  r: 249, g: 115, b: 22  }, // orange    (7-8)
+  { at: 10, r: 239, g: 68,  b: 68  }, // red       (9-10)
+];
+
+const getRatingColor = (rating: number) => {
+  const clamped = Math.max(0, Math.min(10, rating));
+  let lo = RATING_COLOR_STOPS[0];
+  let hi = RATING_COLOR_STOPS[RATING_COLOR_STOPS.length - 1];
+  for (let i = 0; i < RATING_COLOR_STOPS.length - 1; i++) {
+    if (clamped >= RATING_COLOR_STOPS[i].at && clamped <= RATING_COLOR_STOPS[i + 1].at) {
+      lo = RATING_COLOR_STOPS[i];
+      hi = RATING_COLOR_STOPS[i + 1];
+      break;
+    }
+  }
+  const t = lo.at === hi.at ? 0 : (clamped - lo.at) / (hi.at - lo.at);
+  const r = Math.round(lo.r + t * (hi.r - lo.r));
+  const g = Math.round(lo.g + t * (hi.g - lo.g));
+  const b = Math.round(lo.b + t * (hi.b - lo.b));
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
+type ConsensusItem = {
+  title: string;
+  userRating: number;
+  publicRating: number;
+  genre: string;
+  posterUrl: string;
+};
+
+type HistogramItem = {
+  rating: string;
+  user: number;
+  community: number;
+};
+
+type PopularityItem = {
+  title: string;
+  voteCount: number;
+  userRating: number;
+  genre: string;
+  posterUrl: string;
+};
+
+type TrendItem = {
+  date: string;
+  rollingAvg: number;
+  actual: number;
+};
+
+type ThemeItem = {
+  name: string;
+  size: number;
+  avgRating: number;
+};
+
+type CorrelationItem = {
+  tag: string;
+  correlation: number;
+  avgRating: number;
+  count: number;
+};
+
+const ConsensusTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const d = payload[0].payload;
+    return (
+      <div className="rounded-lg border bg-background p-3 shadow-sm max-w-xs">
+        <div className="flex items-start gap-3">
+          {d.posterUrl && (
+            <div className="flex-shrink-0">
+              <img
+                src={d.posterUrl} alt={d.title} loading="lazy"
+                className="w-16 h-24 object-cover rounded shadow-md bg-muted"
+                onError={(e) => { e.currentTarget.parentElement!.style.display = "none"; }}
+              />
+            </div>
+          )}
+          <div className="flex flex-col gap-1 min-w-0">
+            <span className="text-sm text-muted-foreground font-bold leading-tight">{d.title}</span>
+            <span className="text-sm text-muted-foreground">{d.genre}</span>
+            <span className="text-sm text-muted-foreground">Your rating: <span className="font-bold">{d.userRating}/10</span></span>
+            <span className="text-sm text-muted-foreground">Public: <span className="font-bold">{d.publicRating}/10</span></span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+const HistogramTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="rounded-lg border bg-background p-3 shadow-sm">
+        <div className="flex flex-col gap-1">
+          <span className="text-sm text-muted-foreground">Rating <span className="font-bold">{label}/10</span></span>
+          {payload.map((p: any, i: number) => (
+            <span key={i} className="text-sm text-muted-foreground">
+              {p.name === "user" ? "You" : "Community"}: <span className="font-bold">{p.value} movies</span>
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+const PopularityTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const d = payload[0].payload;
+    return (
+      <div className="rounded-lg border bg-background p-3 shadow-sm max-w-xs">
+        <div className="flex items-start gap-3">
+          {d.posterUrl && (
+            <div className="flex-shrink-0">
+              <img
+                src={d.posterUrl} alt={d.title} loading="lazy"
+                className="w-16 h-24 object-cover rounded shadow-md bg-muted"
+                onError={(e) => { e.currentTarget.parentElement!.style.display = "none"; }}
+              />
+            </div>
+          )}
+          <div className="flex flex-col gap-1 min-w-0">
+            <span className="text-sm text-muted-foreground font-bold leading-tight">{d.title}</span>
+            <span className="text-sm text-muted-foreground">{d.genre}</span>
+            <span className="text-sm text-muted-foreground">Your rating: <span className="font-bold">{d.userRating}/10</span></span>
+            <span className="text-sm text-muted-foreground">Popularity: <span className="font-bold">{d.voteCount >= 1000 ? `${(d.voteCount / 1000).toFixed(1).replace(/\.0$/, "")}k` : d.voteCount} votes</span></span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+const formatDate = (dateStr: string) => {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+};
+
+const TrendTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="rounded-lg border bg-background p-3 shadow-sm">
+        <div className="flex flex-col gap-1">
+          <span className="text-sm text-muted-foreground font-bold">{formatDate(label)}</span>
+          <span className="text-sm text-muted-foreground">30-day film avg: <span className="font-bold">{payload[0]?.value}/10</span></span>
+          {payload[1] && <span className="text-sm text-muted-foreground">Actual rating: <span className="font-bold">{payload[1]?.value}/10</span></span>}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+const getCorrelationColor = (avgRating: number) => {
+  if (avgRating >= 6.5) {
+    const t = Math.max(0, Math.min(1, (avgRating - 6.5) / (8.8 - 6.5)));
+    const opacity = 0.25 + t * 0.75;
+    return `rgba(34, 197, 94, ${opacity.toFixed(2)})`;
+  }
+  const t = Math.max(0, Math.min(1, (6.5 - avgRating) / 2.5));
+  const opacity = 0.25 + t * 0.75;
+  return `rgba(239, 68, 68, ${opacity.toFixed(2)})`;
+};
+
+const CorrelationTreemapContent = (props: any) => {
+  const { x, y, width, height, name, avgRating } = props;
+  if (width < 30 || height < 20) return null;
+  const clipId = `ct-${Math.round(x)}-${Math.round(y)}`;
+  const fontSize = width < 100 ? 9 : 11;
+  const charsPerLine = Math.max(4, Math.floor((width - 12) / (fontSize * 0.58)));
+  const label = (name?.length ?? 0) > charsPerLine ? name.slice(0, charsPerLine - 1) + "…" : name;
+  const showRating = height >= 38;
+  return (
+    <g>
+      <clipPath id={clipId}>
+        <rect x={x + 1} y={y + 1} width={width - 2} height={height - 2} />
+      </clipPath>
+      <rect x={x} y={y} width={width} height={height} fill={getCorrelationColor(avgRating)} stroke="#111111" strokeWidth={2} rx={4} />
+      <g clipPath={`url(#${clipId})`}>
+        <text
+          x={x + width / 2} y={showRating ? y + height / 2 - 7 : y + height / 2}
+          textAnchor="middle" dominantBaseline="middle"
+          fill="white" fontSize={fontSize} fontWeight="600"
+        >
+          {label}
+        </text>
+        {showRating && (
+          <text
+            x={x + width / 2} y={y + height / 2 + 8}
+            textAnchor="middle" dominantBaseline="middle"
+            fill="white" fontSize={9} fillOpacity={0.7}
+          >
+            {avgRating}/10
+          </text>
+        )}
+      </g>
+    </g>
+  );
+};
+
+const TreemapTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const d = payload[0]?.payload;
+    if (!d?.name) return null;
+    return (
+      <div className="rounded-lg border bg-background p-3 shadow-sm">
+        <div className="flex flex-col gap-1">
+          <span className="text-sm text-muted-foreground font-bold leading-tight">{d.name}</span>
+          <span className="text-sm text-muted-foreground">Avg rating: <span className="font-bold">{d.avgRating}/10</span></span>
+          <span className="text-sm text-muted-foreground">Movies watched: <span className="font-bold">{d.size}</span></span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+const ScatterLegend = ({
+  data,
+  selectedGenres,
+  onToggle,
+}: {
+  data: { genre: string }[];
+  selectedGenres: Set<string>;
+  onToggle: (genre: string) => void;
+}) => {
+  const genres = [...new Set(data.map(d => d.genre))];
+  const noneSelected = selectedGenres.size === 0;
+  return (
+    <div className="flex flex-wrap gap-2 mt-3 justify-center">
+      {genres.map(g => {
+        const active = noneSelected || selectedGenres.has(g);
+        return (
+          <button
+            key={g}
+            onClick={() => onToggle(g)}
+            className="flex items-center gap-1.5 text-xs rounded px-1.5 py-0.5 cursor-pointer transition-opacity"
+            style={{ opacity: active ? 1 : 0.25 }}
+          >
+            <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: getGenreColor(g) }} />
+            <span style={{ color: active ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.4)" }}>{g}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+const HistogramLegend = () => (
+  <div className="flex gap-4 mt-3 justify-center">
+    <div className="flex items-center gap-1.5 text-xs text-white/60">
+      <div className="w-2.5 h-2.5 rounded-sm bg-[#8b5cf6]" />
+      You
+    </div>
+    <div className="flex items-center gap-1.5 text-xs text-white/60">
+      <div className="w-2.5 h-2.5 rounded-sm bg-white/20" />
+      Community
+    </div>
+  </div>
+);
+
+const QuadrantLabels = (props: any) => {
+  const xAxis = props.xAxisMap?.[0];
+  const yAxis = props.yAxisMap?.[0];
+  if (!xAxis?.scale || !yAxis?.scale) return null;
+
+  const [xMin, xMax] = xAxis.domain ?? [100, 30000];
+  const xMidVal = Math.sqrt(xMin * xMax); // geometric midpoint for log scale
+  const x0   = xAxis.scale(xMin);
+  const xMid = xAxis.scale(xMidVal);
+  const xEnd  = xAxis.scale(xMax);
+  const yTop = yAxis.scale(10);
+  const yMid = yAxis.scale(6);
+  const yBot = yAxis.scale(0);
+
+  if ([x0, xMid, xEnd, yTop, yMid, yBot].some(v => isNaN(v))) return null;
+
+  const quadrants = [
+    { label: "Hidden Gems",       x: (x0 + xMid) / 2,  y: (yTop + yMid) / 2 },
+    { label: "Popular Favorites", x: (xMid + xEnd) / 2, y: (yTop + yMid) / 2 },
+    { label: "Obscure Misses",    x: (x0 + xMid) / 2,  y: (yMid + yBot) / 2 },
+    { label: "Mainstream Misses", x: (xMid + xEnd) / 2, y: (yMid + yBot) / 2 },
+  ];
+
+  return (
+    <g pointerEvents="none">
+      {quadrants.map(({ label, x, y }) => (
+        <text key={label} x={x} y={y} textAnchor="middle" dominantBaseline="middle"
+          fill="rgba(255,255,255,0.30)" fontSize={13} fontWeight="600" letterSpacing="0.5">
+          {label}
+        </text>
+      ))}
+    </g>
+  );
+};
+
+const makeOutlierLabels = (outliers: { title: string; [key: string]: any }[], xKey: string = 'voteCount', yKey: string = 'userRating') =>
+  function OutlierLabels(props: any) {
+    const xAxis = props.xAxisMap?.[0];
+    const yAxis = props.yAxisMap?.[0];
+    if (!xAxis?.scale || !yAxis?.scale) return null;
+    return (
+      <g pointerEvents="none">
+        {outliers.map((d) => {
+          const cx = xAxis.scale(d[xKey]);
+          const cy = yAxis.scale(d[yKey]);
+          if (isNaN(cx) || isNaN(cy)) return null;
+          const label = d.title.length > 18 ? d.title.slice(0, 17) + "…" : d.title;
+          return (
+            <g key={d.title}>
+              <circle cx={cx} cy={cy} r={7} fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth={1.5} />
+              <text x={cx} y={cy - 12} textAnchor="middle" fontSize={9} fill="rgba(255,255,255,0.7)">{label}</text>
+            </g>
+          );
+        })}
+      </g>
+    );
+  };
+
+const CorrelationBar = ({ value, positive }: { value: number; positive: boolean }) => {
+  const width = Math.abs(value) * 100;
+  return (
+    <div className="w-24 h-2 bg-white/5 rounded-full overflow-hidden">
+      <div
+        className="h-full rounded-full"
+        style={{
+          width: `${width}%`,
+          backgroundColor: positive ? "#22c55e" : "#ef4444",
+        }}
+      />
+    </div>
+  );
+};
+
+type AdvancedUserMetricsProps = {
+  sectionTitle: string;
+  consensusData: ConsensusItem[];
+  histogramData: HistogramItem[];
+  popularityData: PopularityItem[];
+  trendData: TrendItem[];
+  themeData: ThemeItem[];
+  positiveCorrelations: CorrelationItem[];
+  negativeCorrelations: CorrelationItem[];
+};
+
+export const AdvancedUserMetrics = ({
+  sectionTitle,
+  consensusData = [],
+  histogramData = [],
+  popularityData = [],
+  trendData = [],
+  themeData = [],
+  positiveCorrelations = [],
+  negativeCorrelations = [],
+}: AdvancedUserMetricsProps) => {
+  const [selectedGenres, setSelectedGenres] = useState<Set<string>>(new Set());
+
+  const toggleGenre = (genre: string) => {
+    setSelectedGenres(prev => {
+      const next = new Set(prev);
+      next.has(genre) ? next.delete(genre) : next.add(genre);
+      return next;
+    });
+  };
+
+  const midpoint = themeData.length > 0 ? themeData.reduce((s, t) => s + t.avgRating, 0) / themeData.length : 3.75;
+  const topThemes = [...themeData].filter(t => t.avgRating >= midpoint).sort((a, b) => b.avgRating - a.avgRating).slice(0, 6);
+  const bottomThemes = [...themeData].filter(t => t.avgRating < midpoint).sort((a, b) => a.avgRating - b.avgRating).slice(0, 6);
+
+  const topMax = topThemes[0]?.avgRating ?? midpoint;
+  const topMin = topThemes[topThemes.length - 1]?.avgRating ?? midpoint;
+  const topRange = topMax - topMin || 1;
+  const bottomMin = bottomThemes[0]?.avgRating ?? 0;
+  const bottomMax = bottomThemes[bottomThemes.length - 1]?.avgRating ?? midpoint;
+  const bottomRange = bottomMax - bottomMin || 1;
+
+  const filteredConsensusData = consensusData.filter(d =>
+    d.genre && d.genre !== "nan" && d.genre !== "None" && d.publicRating > 0
+  );
+
+  const filteredPopularityData = popularityData.filter(d =>
+    d.voteCount > 0 && d.userRating > 0 &&
+    d.genre && d.genre !== "nan" && d.genre !== "None"
+  );
+
+  const visiblePopularityData = useMemo(
+    () => selectedGenres.size === 0
+      ? filteredPopularityData
+      : filteredPopularityData.filter(d => selectedGenres.has(d.genre)),
+    [filteredPopularityData, selectedGenres]
+  );
+
+  const popularityDomain: [number, number] = filteredPopularityData.length > 0
+    ? [
+        Math.pow(10, Math.floor(Math.log10(Math.min(...filteredPopularityData.map(d => d.voteCount))))),
+        Math.pow(10, Math.ceil(Math.log10(Math.max(...filteredPopularityData.map(d => d.voteCount))))),
+      ]
+    : [100, 30000];
+
+  const popMidVotes = filteredPopularityData.length > 0
+    ? Math.sqrt(popularityDomain[0] * popularityDomain[1])
+    : 1000;
+
+  // Top outlier per quadrant to label directly on the chart
+  const hiddenGem = [...filteredPopularityData]
+    .filter(d => d.voteCount < popMidVotes && d.userRating >= 6)
+    .sort((a, b) => (b.userRating - a.userRating) || (a.voteCount - b.voteCount))[0];
+  const mainstreamMiss = [...filteredPopularityData]
+    .filter(d => d.voteCount >= popMidVotes && d.userRating < 6)
+    .sort((a, b) => (a.userRating - b.userRating) || (b.voteCount - a.voteCount))[0];
+  const popularFav = [...filteredPopularityData]
+    .filter(d => d.voteCount >= popMidVotes && d.userRating >= 6)
+    .sort((a, b) => (b.userRating - a.userRating) || (b.voteCount - a.voteCount))[0];
+
+
+  // Personalized insight
+  const topRated = filteredPopularityData.filter(d => d.userRating >= 7);
+  const topRatedNiche = topRated.filter(d => d.voteCount < popMidVotes).length;
+  const nichePercent = topRated.length > 0 ? Math.round((topRatedNiche / topRated.length) * 100) : null;
+  const popularityInsight = (() => {
+    if (!nichePercent) return null;
+    if (nichePercent >= 60) return `You're a hidden gem hunter — ${nichePercent}% of your top-rated films are niche.`;
+    if (nichePercent <= 40) return `You lean mainstream — ${100 - nichePercent}% of your favourites are crowd-pleasers.`;
+    return `You're eclectic — equally at home with cult films and blockbusters.`;
+  })();
+
+  // Consensus outliers
+  const biggestContrarian = [...filteredConsensusData]
+    .filter(d => d.userRating > 0 && d.publicRating > 0)
+    .sort((a, b) => (b.userRating - b.publicRating) - (a.userRating - a.publicRating))[0];
+  const biggestOverrated = [...filteredConsensusData]
+    .filter(d => d.userRating > 0 && d.publicRating > 0)
+    .sort((a, b) => (a.userRating - a.publicRating) - (b.userRating - b.publicRating))[0];
+
+  const consensusInsight = (() => {
+    if (filteredConsensusData.length === 0) return null;
+    const gaps = filteredConsensusData.map(d => d.userRating - d.publicRating);
+    const avgGap = gaps.reduce((s, v) => s + v, 0) / gaps.length;
+    const sign = avgGap >= 0 ? '+' : '';
+    if (avgGap > 0.5) return `You're a generous rater — on average ${sign}${avgGap.toFixed(1)} above the Letterboxd crowd.`;
+    if (avgGap < -0.5) return `You're a harsh critic — on average ${avgGap.toFixed(1)} below the Letterboxd crowd.`;
+    return `Your taste aligns closely with the Letterboxd crowd (avg gap: ${sign}${avgGap.toFixed(1)}).`;
+  })();
+
+  const trendInterval = Math.max(1, Math.floor(trendData.length / 8));
+  const correlationTreemapData = [
+    ...positiveCorrelations.map(c => ({ name: c.tag, size: c.count, avgRating: c.avgRating })),
+    ...negativeCorrelations.map(c => ({ name: c.tag, size: c.count, avgRating: c.avgRating })),
+  ];
   return (
     <div className="rounded-md text-[#e5e3e2]">
       <div className="flex flex-col h-full bg-[#111111] p-4 rounded-xl">
-        <h1 className="text-2xl font-bold mb-4 text-left">{sectionTitle}</h1>
-        
+        {sectionTitle && <h1 className="text-2xl font-bold mb-4 text-left">{sectionTitle}</h1>}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="bg-[#111111] border-0">
+            <CardHeader>
+              <CardTitle className="text-white text-base">Rating vs. Public Consensus</CardTitle>
+              <CardDescription className="text-white/50 text-xs">Points above the line = you loved it more than the public</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={320}>
+                <ScatterChart margin={{ top: 10, right: 10, bottom: 20, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis
+                    type="number" dataKey="publicRating" name="Public Rating"
+                    domain={[0, 10]} tickCount={6}
+                    tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
+                    axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                    label={{ value: "Public Rating", position: "bottom", offset: 0, fill: "rgba(255,255,255,0.3)", fontSize: 11 }}
+                  />
+                  <YAxis
+                    type="number" dataKey="userRating" name="Your Rating"
+                    domain={[0, 10]} tickCount={6}
+                    tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
+                    axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                    label={{ value: "Your Rating", angle: -90, position: "insideLeft", offset: 10, fill: "rgba(255,255,255,0.3)", fontSize: 11 }}
+                  />
+                  <ReferenceLine
+                    segment={[{ x: 0, y: 0 }, { x: 10, y: 10 }]}
+                    stroke="rgba(255,255,255,0.15)" strokeDasharray="5 5"
+                  />
+                  <Tooltip content={<ConsensusTooltip />} cursor={{ strokeDasharray: "3 3", stroke: "rgba(255,255,255,0.1)" }} />
+                  <Scatter data={filteredConsensusData} fillOpacity={0.85}>
+                    {filteredConsensusData.map((entry, i) => (
+                      <Cell key={i} fill={getRatingColor(entry.userRating)} r={3 + Math.abs(entry.userRating - entry.publicRating) * 0.5} />
+                    ))}
+                  </Scatter>
+                  <Customized component={makeOutlierLabels(
+                    [biggestContrarian, biggestOverrated].filter(Boolean) as ConsensusItem[], 'publicRating', 'userRating'
+                  )} />
+                </ScatterChart>
+              </ResponsiveContainer>
+              {consensusInsight && (
+                <p className="text-xs text-white/50 italic mt-2 text-center">{consensusInsight}</p>
+              )}
+            </CardContent>
+          </Card>
 
+          <Card className="bg-[#111111] border-0">
+            <CardHeader>
+              <CardTitle className="text-white text-base">Your Ratings vs. Community</CardTitle>
+              <CardDescription className="text-white/50 text-xs">How your rating distribution compares to a representative community sample</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={320}>
+                <AreaChart data={histogramData} margin={{ top: 10, right: 10, bottom: 20, left: 0 }}>
+                  <defs>
+                    <linearGradient id="histUserGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.5} />
+                      <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.05} />
+                    </linearGradient>
+                    <linearGradient id="histCommunityGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="rgba(255,255,255,1)" stopOpacity={0.2} />
+                      <stop offset="100%" stopColor="rgba(255,255,255,1)" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis
+                    dataKey="rating" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
+                    axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                    label={{ value: "Rating", position: "bottom", offset: 0, fill: "rgba(255,255,255,0.3)", fontSize: 11 }}
+                  />
+                  <YAxis
+                    tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
+                    axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                    label={{ value: "Movies", angle: -90, position: "insideLeft", offset: 10, fill: "rgba(255,255,255,0.3)", fontSize: 11 }}
+                  />
+                  <Tooltip content={<HistogramTooltip />} cursor={{ stroke: "rgba(255,255,255,0.1)", strokeDasharray: "3 3" }} />
+                  <Area type="monotone" dataKey="community" stroke="rgba(255,255,255,0.3)" strokeWidth={2} fill="url(#histCommunityGradient)" dot={false} />
+                  <Area type="monotone" dataKey="user" stroke="#8b5cf6" strokeWidth={2} fill="url(#histUserGradient)" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+              <HistogramLegend />
+            </CardContent>
+          </Card>
+        </div>
+
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="bg-[#111111] border-0">
+            <CardHeader>
+              <CardTitle className="text-white text-base">Popularity vs. Your Rating</CardTitle>
+              <CardDescription className="text-white/50 text-xs">Do you prefer hidden gems or blockbusters?</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={320}>
+                <ScatterChart margin={{ top: 10, right: 10, bottom: 20, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis
+                    type="number" dataKey="voteCount" name="Vote Count"
+                    scale="log" domain={popularityDomain}
+                    tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
+                    axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                    tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)}
+                    label={{ value: "Popularity (votes, log scale)", position: "bottom", offset: 0, fill: "rgba(255,255,255,0.3)", fontSize: 11 }}
+                  />
+                  <YAxis
+                    type="number" dataKey="userRating" name="Your Rating"
+                    domain={[0, 10]} tickCount={6}
+                    tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
+                    axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                    label={{ value: "Your Rating", angle: -90, position: "insideLeft", offset: 10, fill: "rgba(255,255,255,0.3)", fontSize: 11 }}
+                  />
+                  <ReferenceLine y={6} stroke="rgba(255,255,255,0.1)" strokeDasharray="5 5" />
+                  <ReferenceLine x={Math.sqrt(popularityDomain[0] * popularityDomain[1])} stroke="rgba(255,255,255,0.1)" strokeDasharray="5 5" />
+                  <Tooltip content={<PopularityTooltip />} cursor={{ strokeDasharray: "3 3", stroke: "rgba(255,255,255,0.1)" }} />
+                  <Scatter data={visiblePopularityData} fillOpacity={0.85} isAnimationActive={false}>
+                    {visiblePopularityData.map((entry, i) => (
+                      <Cell key={i} fill={getGenreColor(entry.genre)} r={3 + Math.abs(entry.userRating - 5) * 0.6} />
+                    ))}
+                  </Scatter>
+                  <Customized component={QuadrantLabels} />
+                  <Customized component={makeOutlierLabels(
+                    (selectedGenres.size === 0 ? [hiddenGem, mainstreamMiss, popularFav].filter(Boolean) : []) as PopularityItem[]
+                  )} />
+                </ScatterChart>
+              </ResponsiveContainer>
+              {popularityInsight && (
+                <p className="text-xs text-white/50 italic mt-2 text-center">{popularityInsight}</p>
+              )}
+              <ScatterLegend data={filteredPopularityData} selectedGenres={selectedGenres} onToggle={toggleGenre} />
+            </CardContent>
+          </Card>
+
+          <Card className="bg-[#111111] border-0">
+            <CardHeader>
+              <CardTitle className="text-white text-base">Rating Trend Over Time</CardTitle>
+              <CardDescription className="text-white/50 text-xs">30-day film rolling average of your ratings — are you getting more critical?</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={360}>
+                <AreaChart data={trendData} margin={{ top: 10, right: 10, bottom: 20, left: 0 }}>
+                  <defs>
+                    <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#f97316" stopOpacity={0.75} />
+                      <stop offset="100%" stopColor="#f97316" stopOpacity={0.05} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }}
+                    axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                    interval={trendInterval}
+                    tickFormatter={formatDate}
+                    label={{ value: "Date", position: "bottom", offset: 0, fill: "rgba(255,255,255,0.3)", fontSize: 11 }}
+                  />
+                  <YAxis
+                    domain={[5, 9]} tickCount={5}
+                    tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
+                    axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                    label={{ value: "Rating", angle: -90, position: "insideLeft", offset: 10, fill: "rgba(255,255,255,0.3)", fontSize: 11 }}
+                  />
+                  <Tooltip content={<TrendTooltip />} />
+                  <Area type="monotone" dataKey="rollingAvg" stroke="#f97316" strokeWidth={2} fill="url(#trendGradient)" />
+                  <Line type="monotone" dataKey="actual" stroke="rgba(255,255,255,0.2)" strokeWidth={1} dot={{ fill: "rgba(255,255,255,0.3)", r: 2 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="bg-[#111111] border-0">
+          <CardHeader>
+            <CardTitle className="text-white text-base">Nanogenres Explorer</CardTitle>
+            <CardDescription className="text-white/50 text-xs">
+              Nanogenre tags most correlated with your high and low ratings. Size = movies watched. Color = rating.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={360}>
+              <Treemap
+                data={correlationTreemapData}
+                dataKey="size"
+                stroke="none"
+                content={<CorrelationTreemapContent />}
+                animationDuration={300}
+              >
+                <Tooltip content={<TreemapTooltip />} />
+              </Treemap>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-[#111111] border-0 mb-6">
+          <CardHeader>
+            <CardTitle className="text-white text-base">Your Perfect Movie Recipe</CardTitle>
+            <CardDescription className="text-white/50 text-xs">
+              Themes ranked by your average rating
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-emerald-400/80 uppercase tracking-wider font-semibold mb-3">Themes You Love</p>
+            <div className="space-y-2 mb-6">
+              {topThemes.map((item) => (
+                <div key={item.name} className="flex items-center bg-white/[0.02] rounded-lg px-3 py-2">
+                  <span className="text-sm text-white/80 flex-1 min-w-0 truncate">{item.name}</span>
+                  <div className="flex items-center gap-3 ml-4 shrink-0">
+                    <CorrelationBar value={Math.max(0.15, (item.avgRating - topMin) / topRange)} positive />
+                    <span className="text-xs text-emerald-400 font-mono w-8 text-right shrink-0">{item.avgRating}</span>
+                    <span className="text-xs text-white/30 w-20 text-right shrink-0 whitespace-nowrap">{item.size} movies</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-red-400/80 uppercase tracking-wider font-semibold mb-3">Themes You Avoid</p>
+            <div className="space-y-2">
+              {[...bottomThemes].reverse().map((item) => (
+                <div key={item.name} className="flex items-center bg-white/[0.02] rounded-lg px-3 py-2">
+                  <span className="text-sm text-white/80 flex-1 min-w-0 truncate">{item.name}</span>
+                  <div className="flex items-center gap-3 ml-4 shrink-0">
+                    <CorrelationBar value={Math.max(0.15, (bottomMax - item.avgRating) / bottomRange)} positive={false} />
+                    <span className="text-xs text-red-400 font-mono w-8 text-right shrink-0">{item.avgRating}</span>
+                    <span className="text-xs text-white/30 w-20 text-right shrink-0 whitespace-nowrap">{item.size} movies</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

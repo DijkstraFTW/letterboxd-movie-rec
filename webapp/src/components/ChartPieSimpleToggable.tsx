@@ -41,7 +41,7 @@ function ChartPieSimpleToggable({
   altData,
   legendKey = true,
 }: ChartPieSimpleProps) {
-  const [useAltData, setUseAltData] = useState(false)
+  const [useAltData, setUseAltData] = useState(true)
   const activeData = useAltData && altData ? altData : data
 
   const total = activeData.reduce((acc, d) => acc + d[dataKey], 0)
@@ -60,7 +60,7 @@ function ChartPieSimpleToggable({
   }
 
   return (
-        <Card className="bg-transparent text-card-white flex flex-col gap-6 rounded-xl border-0 py-6">
+    <Card className="bg-transparent text-card-white flex flex-col gap-6 rounded-xl border-0 py-6">
       <CardHeader className="items-center pb-0">
         <CardTitle>{title}</CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
@@ -75,13 +75,13 @@ function ChartPieSimpleToggable({
                   const entry = payload[0].payload
                   const value = Number(payload[0].value ?? 0)
                   const label = config[entry[nameKey]]?.label || entry[nameKey]
-                  const percent = Math.round((value / total) * 100)
+                  const percent = ((value / total) * 100).toFixed(2)
 
                   return (
                     <div className="rounded-lg border bg-background p-3 shadow-sm">
                       <div className="flex flex-col gap-1">
                         <span className="text-sm text-muted-foreground">
-                          <span className="font-bold">{label}</span> accounts for <span className="font-bold">{value}</span> ({percent}%) of your activity.
+                          <span className="font-bold">{label}</span> accounts for <span className="font-bold">{Number.isInteger(value) ? value.toLocaleString() : value.toFixed(2)}</span> ({percent}%) of your activity.
                         </span>
                       </div>
                     </div>
@@ -92,18 +92,17 @@ function ChartPieSimpleToggable({
             />
             <Pie data={activeData} dataKey={dataKey} nameKey={nameKey}>
               {activeData.map((_, index) => {
-                // Use vibrant, distinct colors for each slice
                 const colors = [
-                  '#ef4444', // red
-                  '#3b82f6', // blue
-                  '#10b981', // green
-                  '#f59e0b', // amber
-                  '#8b5cf6', // violet
-                  '#ec4899', // pink
-                  '#14b8a6', // teal
-                  '#f97316', // orange
-                  '#06b6d4', // cyan
-                  '#84cc16', // lime
+                  '#ef4444',
+                  '#3b82f6',
+                  '#10b981',
+                  '#f59e0b',
+                  '#8b5cf6',
+                  '#ec4899',
+                  '#14b8a6',
+                  '#f97316',
+                  '#06b6d4',
+                  '#84cc16',
                 ]
                 return <Cell key={index} fill={colors[index % colors.length]} />
               })}
@@ -115,13 +114,12 @@ function ChartPieSimpleToggable({
         {legendKey && (
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-center gap-2 leading-none font-medium">
-              {topEntry[nameKey]} leads with {topEntry[dataKey]} ({topPercent}%)
+              {topEntry[nameKey]} leads with {Number.isInteger(topEntry[dataKey]) ? Number(topEntry[dataKey]).toLocaleString() : Number(topEntry[dataKey]).toFixed(2)} ({topPercent}%)
               <TrendingUp className="h-4 w-4" />
             </div>
             <div className="text-muted-foreground leading-none">{comparisonMessage}</div>
           </div>
         )}
-        
         {altData && (
           <Button
             size="sm"
@@ -129,7 +127,7 @@ function ChartPieSimpleToggable({
             className="mt-2 inline-flex items-center justify-center whitespace-nowrap transition-colors focus-visible:outline-none cursor-pointer disabled:pointer-events-none disabled:opacity-50 border px-3 py-1.5 bg-white/5 hover:bg-white text-white/80 border-white/5 text-sm h-8 font-medium"
             onClick={() => setUseAltData(!useAltData)}
           >
-            {useAltData ? "Show Rating" : "Show Watch Count"}
+            {useAltData ? "Show by Watch Count" : "Show by Rating"}
           </Button>
         )}
       </CardFooter>

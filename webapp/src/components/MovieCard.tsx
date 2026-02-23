@@ -26,17 +26,33 @@ export function MovieCard({
   genres,
   histogram,
   showTopPickButton = true,
+  onImageSettle,
 }: {
   poster_url: string;
   movie_title: string;
   movie_title_formatted?: string;
   runtime?: string;
   lb_rating?: number;
-  genres?: string[];
-  histogram?: { total: number; fans: number };
+  genres?: string[] | string;
+  histogram?: { total: number; fans: number } | string;
   showTopPickButton?: boolean;
+  onImageSettle?: () => void;
 }) {
   const [isHover, setIsHover] = useState(false);
+
+  const parsedHistogram: { total: number; fans: number } | null = (() => {
+    if (!histogram) return null;
+    if (typeof histogram === 'string') {
+      try { return JSON.parse(histogram); } catch { return null; }
+    }
+    return histogram;
+  })();
+
+  const parsedGenres: string[] = Array.isArray(genres)
+    ? genres
+    : typeof genres === 'string' && genres
+      ? (genres.match(/'([^']+)'/g)?.map(s => s.replace(/'/g, '')) ?? [])
+      : [];
   const [isTopPick, setIsTopPick] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -65,8 +81,13 @@ export function MovieCard({
           'X-API-Key': MIDDLEWARE_API_KEY,
         },
         body: JSON.stringify({
+          movie_title: movie_title,
           movie_title_formatted: movie_title_formatted,
           poster_url: poster_url,
+          lb_rating: lb_rating ?? 0.0,
+          genres: parsedGenres,
+          histogram: parsedHistogram ?? {},
+          runtime: runtime ? parseInt(runtime) : 0,
         }),
       });
 
@@ -92,6 +113,8 @@ export function MovieCard({
         src={poster_url}
         alt={movie_title}
         className="absolute inset-0 w-full h-full object-cover rounded-lg border border-white/50 shadow-sm"
+        onLoad={onImageSettle}
+        onError={onImageSettle}
       />
       {showTopPickButton && (
         <Tooltip>
@@ -165,11 +188,11 @@ export function MovieCard({
           )}
         </div>
 
-        {histogram !== undefined && <RatingsLineChart data={histogram} />}
+        {parsedHistogram !== null && <RatingsLineChart data={parsedHistogram} />}
 
-        {genres && genres.length > 0 && (
+        {parsedGenres.length > 0 && (
           <div className='flex flex-wrap gap-1 mt-3'>
-            {genres.slice(0, 2).map((genre) => (
+            {parsedGenres.slice(0, 2).map((genre: string) => (
               <Badge
                 key={genre}
                 className='text-xs px-2 py-0.5 bg-white/25 backdrop-blur-sm text-white rounded-full shadow-sm'

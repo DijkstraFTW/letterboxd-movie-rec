@@ -5,7 +5,7 @@ from processing.utils.utils import remove_stopwords, create_bag_of_words
 
 from app_logger.app_logger import setup_logger
 
-logger = setup_logger("../logs/data_loader.log", "DataLoader")
+logger = setup_logger("/root/letterboxd-movie-rec/logs/data_loader.log", "DataLoader")
 
 
 class DataLoader:
@@ -202,6 +202,7 @@ class DataLoader:
                                 "type": i.get("type"), "year_released": i.get("year_released"), "imdb_link": i.get("imdb_link"),
                                 "tmdb_link": i.get("tmdb_link"), "imdb_id": i.get("imdb_id"), "tmdb_id": i.get("tmdb_id"),
                                 "poster_url": i.get("poster_url"), "genres": i.get("genres"),
+                                "themes": i.get("themes"), "nanogenres": i.get("nanogenres"),
                                 "production_countries": i.get("production_countries"),
                                 "spoken_languages": i.get("spoken_languages"), "popularity": i.get("popularity"),
                                 "overview": i.get("overview"), "runtime": i.get("runtime"), "vote_average": i.get("vote_average"),
@@ -210,7 +211,7 @@ class DataLoader:
 
         df_movies = pd.DataFrame(movies_list)
         df_movies["movie_title_formatted"] = df_movies["movie_title_formatted"].astype(str)
-        df_movies = df_movies.dropna()
+        df_movies = df_movies.dropna(subset=['movie_title', 'vote_average', 'vote_count'])
 
         logger.info(f"{len(df_movies)} movies successfully loaded!")
 

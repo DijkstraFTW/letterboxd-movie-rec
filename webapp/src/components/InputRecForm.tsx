@@ -6,28 +6,37 @@ import { Slider } from "../../shadcn/components/ui/slider.tsx"
 import { Label } from "../../shadcn/components/ui/label.tsx"
 
 const genreOptions: { label: string; value: string }[] = [
-  { label: "action", value: "Action" },
-  { label: "adventure", value: "Adventure" },
-  { label: "animation", value: "Animation" },
-  { label: "comedy", value: "Comedy" },
-  { label: "crime", value: "Crime" },
-  { label: "documentary", value: "Documentary" },
-  { label: "drama", value: "Drama" },
-  { label: "family", value: "Family" },
-  { label: "fantasy", value: "Fantasy" },
-  { label: "history", value: "History" },
-  { label: "horror", value: "Horror" },
-  { label: "music", value: "Music" },
-  { label: "mystery", value: "Mystery" },
-  { label: "romance", value: "Romance" },
-  { label: "sci-fi", value: "Sci-Fi" },
-  { label: "thriller", value: "Thriller" },
-  { label: "war", value: "War" },
-  { label: "western", value: "Western" },
+  { label: "Action", value: "Action" },
+  { label: "Action & Adventure", value: "Action & Adventure" },
+  { label: "Adventure", value: "Adventure" },
+  { label: "Animation", value: "Animation" },
+  { label: "Comedy", value: "Comedy" },
+  { label: "Crime", value: "Crime" },
+  { label: "Documentary", value: "Documentary" },
+  { label: "Drama", value: "Drama" },
+  { label: "Family", value: "Family" },
+  { label: "Fantasy", value: "Fantasy" },
+  { label: "History", value: "History" },
+  { label: "Horror", value: "Horror" },
+  { label: "Kids", value: "Kids" },
+  { label: "Music", value: "Music" },
+  { label: "Mystery", value: "Mystery" },
+  { label: "News", value: "News" },
+  { label: "Reality", value: "Reality" },
+  { label: "Romance", value: "Romance" },
+  { label: "Sci-Fi & Fantasy", value: "Sci-Fi & Fantasy" },
+  { label: "Science Fiction", value: "Science Fiction" },
+  { label: "Soap", value: "Soap" },
+  { label: "Talk", value: "Talk" },
+  { label: "Thriller", value: "Thriller" },
+  { label: "TV Movie", value: "TV Movie" },
+  { label: "War", value: "War" },
+  { label: "War & Politics", value: "War & Politics" },
+  { label: "Western", value: "Western" },
 ]
 
 interface InputRecFormProps {
-  onSubmit: () => void;
+  onSubmit: (genres: string[], minRating: number) => void;
 }
 
 export function InputRecForm({ onSubmit }: InputRecFormProps) {
@@ -36,10 +45,7 @@ export function InputRecForm({ onSubmit }: InputRecFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log({ genres, min_rating: min_rating[0] })
-    onSubmit()
-    // Replace with your actual API call:
-    // const res = await fetch('/api/recommendations', { ... })
+    onSubmit(genres, min_rating[0])
   }
 
   return (

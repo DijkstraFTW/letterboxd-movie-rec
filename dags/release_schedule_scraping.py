@@ -1,13 +1,12 @@
+import sys
+sys.path.insert(0, "/root/letterboxd-movie-rec")
+
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import json
-import os
 import random
 import re
-import sys
 import time
-
-sys.path.insert(0, "/home/ubuntu/app/")
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -21,9 +20,9 @@ from urllib3.util.retry import Retry
 from app_logger.app_logger import setup_logger
 from messaging.redis_client import RedisClient
 
-load_dotenv()
+load_dotenv("/root/letterboxd-movie-rec/.env")
 
-logger = setup_logger("../logs/release_schedule_dag.log", "ReleaseScheduleDAG")
+logger = setup_logger("/root/letterboxd-movie-rec/logs/release_schedule_dag.log", "ReleaseScheduleDAG")
 
 
 BASE_URL = "https://whentostream.com"
@@ -35,7 +34,7 @@ MONTH_NAMES = {
 }
 
 DEFAULT_ARGS = {
-    "owner": "airflow",
+    "owner": "DijkstraFTW",
     "depends_on_past": False,
     "email_on_failure": False,
     "email_on_retry": False,
@@ -227,30 +226,22 @@ def scrape_and_publish(**context):
 
     try:
         redis_client = RedisClient()
-        release_queue = os.getenv('REDIS_QUEUE_RELEASES', 'release_schedule')
 
-        for date_key in all_dates:
-            message = {
+        all_releases = [
+            {
                 'date': date_key,
                 'scraped_at': today_str,
                 'streaming_releases': all_streaming.get(date_key, []),
                 'theater_releases': all_theaters.get(date_key, []),
             }
+            for date_key in all_dates
+        ]
 
-            json_message = json.dumps(message, ensure_ascii=False)
-            redis_client.client.publish(release_queue, json_message)
-
-            logger.info(
-                "Published releases for %s: %d streaming, %d theater",
-                date_key,
-                len(message['streaming_releases']),
-                len(message['theater_releases']),
-            )
-
-        logger.info("Successfully published all release data to Redis queue '%s'", release_queue)
+        redis_client.client.set("upcoming_releases", json.dumps(all_releases, ensure_ascii=False))
+        logger.info("Stored %d release dates in Redis under key 'upcoming_releases'", len(all_dates))
 
     except Exception as e:
-        logger.error("Error publishing to Redis: %s", e, exc_info=True)
+        logger.error("Error writing releases to Redis: %s", e, exc_info=True)
         raise
 
     return len(all_dates)
@@ -267,7 +258,6 @@ with DAG(
     schedule="0 5 * * *", 
     start_date=datetime(2026, 2, 1),
     catchup=False,
-    tags=["scraping", "movies", "whentostream", "redis"],
 ) as dag:
 
     scrape_task = PythonOperator(

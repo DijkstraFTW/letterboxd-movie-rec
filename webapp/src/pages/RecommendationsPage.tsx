@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header.tsx";
 import Footer from "../components/Footer.tsx";
@@ -32,29 +32,40 @@ const GENRES_CONFIG = {
   ],
 };
 
-const getRandomInterval = () => Math.floor(Math.random() * 4000) + 4000;
+const MAX_POLL_DURATION_MS = 5 * 60 * 1000;
+const POLL_INTERVAL_MS = 5000;
+const FINISHING_UP_DURATION_MS = 4000;
+const getRandomInterval = () => Math.floor(Math.random() * 4000) + 10000;
 
 const RecommendationsPage = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [formType, setFormType] = useState<FormType>(null);
   const [messageIndex, setMessageIndex] = useState(0);
+  const [loadError, setLoadError] = useState(false);
+  const [scrapeWarning, setScrapeWarning] = useState(false);
+  const [isFinishing, setIsFinishing] = useState(false);
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollStartRef = useRef<number>(0);
 
   useEffect(() => {
     if (!isLoading) return;
 
     const config = formType === "letterboxd" ? LETTERBOXD_CONFIG : GENRES_CONFIG;
 
-    const scheduleNextMessage = () => {
+    const lastStepIndex = config.descriptions.length - 2; // stop before "Finishing up"
+
+    const scheduleNextMessage = (currentIndex: number) => {
+      if (currentIndex >= lastStepIndex) return undefined;
       const interval = getRandomInterval();
       return setTimeout(() => {
-        setMessageIndex((prev) => (prev + 1) % config.descriptions.length);
-        scheduleNextMessage();
+        setMessageIndex(currentIndex + 1);
+        scheduleNextMessage(currentIndex + 1);
       }, interval);
     };
 
-    const timer = scheduleNextMessage();
-    return () => clearTimeout(timer);
+    const timer = scheduleNextMessage(0);
+    return () => { if (timer) clearTimeout(timer); };
   }, [isLoading, formType]);
 
   useEffect(() => {
@@ -63,29 +74,106 @@ const RecommendationsPage = () => {
     }
   }, [isLoading]);
 
-  const handleLetterboxdSubmit = () => {
+  useEffect(() => {
+    return () => {
+      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+    };
+  }, []);
+
+  const handleLetterboxdSubmit = async (username: string, dataOptIn: boolean) => {
     setFormType("letterboxd");
     setIsLoading(true);
-    // TODO: When API call is implemented, move navigation to happen after successful response
-    // For now, simulate loading and navigate after a delay
-    setTimeout(() => {
-      navigate('/results', { state: { formType: 'letterboxd' } });
-    }, 16000);
+    setLoadError(false);
+
+    const runId = Date.now().toString();
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_MIDDLEWARE_HOST}/recommend/trigger`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': import.meta.env.VITE_MIDDLEWARE_API_KEY,
+        },
+        body: JSON.stringify({ letterboxd_username: username, data_opt_in: dataOptIn, run_id: runId }),
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    } catch (err) {
+      console.error('Error triggering Letterboxd recommendation:', err);
+      setIsLoading(false);
+      return;
+    }
+
+    pollStartRef.current = Date.now();
+
+    const poll = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_MIDDLEWARE_HOST}/recommend/results?username=${encodeURIComponent(username)}&run_id=${runId}`,
+          { headers: { 'X-API-Key': import.meta.env.VITE_MIDDLEWARE_API_KEY } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.error) {
+            setLoadError(true);
+            return;
+          }
+          if (data?.scrape_failed) {
+            setScrapeWarning(true);
+          }
+          if (data && Array.isArray(data.user_recommendation) && data.user_recommendation.length > 0) {
+            setIsFinishing(true);
+            setTimeout(() => {
+              navigate('/results', {
+                state: {
+                  formType: 'letterboxd',
+                  username,
+                  movies: data.user_recommendation,
+                  analytics: data.user_analytics ?? {},
+                },
+              });
+            }, FINISHING_UP_DURATION_MS);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Error polling results:', err);
+      }
+
+      if (Date.now() - pollStartRef.current < MAX_POLL_DURATION_MS) {
+        pollTimeoutRef.current = setTimeout(poll, POLL_INTERVAL_MS);
+      } else {
+        setLoadError(true);
+      }
+    };
+
+    poll();
   };
 
-  const handleGenresSubmit = () => {
+  const handleGenresSubmit = async (genres: string[], minRating: number) => {
     setFormType("genres");
     setIsLoading(true);
-    // TODO: When API call is implemented, move navigation to happen after successful response
-    // For now, simulate loading and navigate after a delay
-    setTimeout(() => {
-      navigate('/results', { state: { formType: 'genres' } });
-    }, 16000);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_MIDDLEWARE_HOST}/recommend/fallback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': import.meta.env.VITE_MIDDLEWARE_API_KEY,
+        },
+        body: JSON.stringify({ genres, minimum_rating: minRating }),
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const movies = await response.json();
+      navigate('/results', { state: { formType: 'genres', movies } });
+    } catch (err) {
+      console.error('Error fetching genre recommendations:', err);
+      setLoadError(true);
+    }
   };
 
   if (isLoading) {
     const config = formType === "letterboxd" ? LETTERBOXD_CONFIG : GENRES_CONFIG;
-    const currentDescription = config.descriptions[messageIndex];
+    const lastDescription = config.descriptions[config.descriptions.length - 1];
+    const currentDescription = isFinishing ? lastDescription : config.descriptions[messageIndex];
 
     return (
       <div className="flex flex-col min-h-screen bg-black text-white">
@@ -96,10 +184,15 @@ const RecommendationsPage = () => {
               <EmptyMedia variant="icon">
                 <Spinner />
               </EmptyMedia>
-              <EmptyTitle>{config.title}...</EmptyTitle>
+              <EmptyTitle>{loadError ? "Something went wrong" : `${config.title}...`}</EmptyTitle>
               <EmptyDescription>
-                {currentDescription}
+                {loadError ? "We couldn't generate your recommendations. Please try again." : currentDescription}
               </EmptyDescription>
+              {scrapeWarning && !loadError && (
+                <p className="mt-3 text-sm text-yellow-400">
+                  We couldn't find your Letterboxd reviews — recommendations will be less personalized.
+                </p>
+              )}
             </EmptyHeader>
           </Empty>
         </div>

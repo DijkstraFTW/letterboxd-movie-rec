@@ -73,24 +73,22 @@ const CalendarPage = () => {
 
             const data = await response.json();
 
-            const flattenReleases = (releasesData: any[]) => {
-                if (!releasesData || releasesData.length === 0) return [];
+            const allStreaming: Release[] = [];
+            const allTheatrical: Release[] = [];
 
-                const flatArray: Release[] = [];
-                const dateObject = releasesData[0];
-
-                Object.keys(dateObject).forEach(date => {
-                    const moviesForDate = dateObject[date];
-                    if (Array.isArray(moviesForDate)) {
-                        flatArray.push(...moviesForDate);
+            if (Array.isArray(data)) {
+                data.forEach((dateEntry: any) => {
+                    if (Array.isArray(dateEntry.streaming_releases)) {
+                        allStreaming.push(...dateEntry.streaming_releases);
+                    }
+                    if (Array.isArray(dateEntry.theater_releases)) {
+                        allTheatrical.push(...dateEntry.theater_releases);
                     }
                 });
+            }
 
-                return flatArray;
-            };
-
-            setStreamingReleases(flattenReleases(data.streamingReleases));
-            setTheatricalReleases(flattenReleases(data.theatricalReleases));
+            setStreamingReleases(allStreaming);
+            setTheatricalReleases(allTheatrical);
             setTimeout(() => {
                 setIsLoading(false);
             }, 2000);

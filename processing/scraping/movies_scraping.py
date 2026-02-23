@@ -1,22 +1,23 @@
 import datetime
+import json
 import time
 import os
 import re
 import asyncio
-import aiohttp
+import random
+from curl_cffi.requests import AsyncSession
 from bs4 import BeautifulSoup
 
 from processing.utils.utils import val2stars
 from app_logger.app_logger import setup_logger
 
-logger = setup_logger("../logs/movies_scraping.log", "MoviesScraping")
+logger = setup_logger("/root/letterboxd-movie-rec/logs/movies_scraping.log", "MoviesScraping")
 
 
 class MoviesScraping:
 
-    def __init__(self, movies_list):
+    def __init__(self, movies_list, max_concurrent=4, requests_per_second=2):
         self.movies_url = "https://letterboxd.com/film/{}/"
-        self.posters_url = "https://letterboxd.com/ajax/poster/film/{}/hero/230x345"
         self.themoviedb_url = "https://api.themoviedb.org/3/{}/{}"
         self.themoviedb_key = os.getenv("THEMOVIEDB_KEY")
         self.empty_image_url_prefix = "https://s.ltrbxd.com/static/img/empty-poster"
@@ -25,62 +26,84 @@ class MoviesScraping:
         self.movie_reviews_url = "https://letterboxd.com/film/{}/reviews/by/added-earliest/page/{}/"
         self.rating_histograms_url = "https://letterboxd.com/csi/film/{}/rating-histogram/"
         self.movies_list = movies_list
-        
+
         # Concurrency settings
-        self.max_concurrent = os.getenv("MAX_CONCURRENT")
-        self.requests_per_second = os.getenv("REQUESTS_PER_SECONDS")
-        self.delay_between_requests = 1.0 / os.getenv("REQUESTS_PER_SECONDS")
-        self.semaphore = asyncio.Semaphore(os.getenv("MAX_CONCURRENT"))
+        self.max_concurrent = max_concurrent
+        self.requests_per_second = requests_per_second
+        self.delay_between_requests = 1.0 / requests_per_second
+        self.semaphore = asyncio.Semaphore(max_concurrent)
         self.last_request_time = 0
         self.session = None
 
     async def __aenter__(self):
-        timeout = aiohttp.ClientTimeout(total=30, connect=10, sock_connect=10, sock_read=10)
-        self.session = aiohttp.ClientSession(
-            timeout=timeout,
-            headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-        )
+        proxy_url = os.getenv("PROXY_URL")
+        proxies = {"https": proxy_url, "http": proxy_url} if proxy_url else None
+        self.session = AsyncSession(impersonate="chrome120", timeout=30, proxies=proxies, verify=False)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.session.close()
 
-    async def rate_limited_request(self, url):
+    async def rate_limited_request(self, url, _retries=0):
         """
-        Rate limited request with concurrency control
+        Rate limited request with concurrency control and exponential backoff
         """
-        async with self.semaphore:
+        max_retries = 3
+        status = None
+        text = None
+        retry_after = None
+        connection_error = None
 
+        async with self.semaphore:
             now = time.time()
             elapsed = now - self.last_request_time
-            if elapsed < self.delay_between_requests:
-                await asyncio.sleep(self.delay_between_requests - elapsed)
-            
+            delay = self.delay_between_requests + random.uniform(0.5, 2.0)
+            if elapsed < delay:
+                await asyncio.sleep(delay - elapsed)
+
             self.last_request_time = time.time()
-            
+
             try:
-                async with self.session.get(url) as response:
-                    if response.status == 429:  
-                        retry_after = int(response.headers.get('Retry-After', 5))
-                        logger.warning(f"Rate limited. Waiting {retry_after} seconds")
-                        await asyncio.sleep(retry_after)
-                        return await self.rate_limited_request(url) 
-                    
-                    response.raise_for_status()
-                    return await response.text()
-                    
-            except aiohttp.ClientResponseError as e:
-                if e.status == 429:
-                    logger.warning(f"Rate limited on {url}. Waiting 5 seconds")
-                    await asyncio.sleep(5)
-                    return await self.rate_limited_request(url)
-                logger.error(f"HTTP error for {url}: {e}")
-                return ""
+                response = await self.session.get(url)
+                status = response.status_code
+                text = response.text if status == 200 else None
+                retry_after = response.headers.get('Retry-After')
             except Exception as e:
-                logger.error(f"Error fetching {url}: {e}")
-                return ""
+                connection_error = e
+
+        # All retries and sleeps happen outside the semaphore to avoid deadlocks
+        if connection_error is not None:
+            logger.error(f"Error fetching {url}: {connection_error}")
+            if _retries < max_retries:
+                wait = 2 ** _retries
+                logger.warning(f"Retrying {url} in {wait}s (attempt {_retries + 1}/{max_retries})")
+                await asyncio.sleep(wait)
+                return await self.rate_limited_request(url, _retries + 1)
+            return ""
+
+        if status == 200:
+            return text
+
+        if status == 404:
+            logger.warning(f"404 Not Found: {url}")
+            return ""
+
+        if _retries >= max_retries:
+            logger.error(f"HTTP {status} for {url} after {max_retries} retries")
+            return ""
+
+        if status == 429:
+            wait = max(int(retry_after) if retry_after else 30, 30)
+            logger.warning(f"Rate limited on {url}. Waiting {wait}s")
+        elif status == 403:
+            wait = 10 * (2 ** _retries)
+            logger.warning(f"403 Forbidden for {url}. Backing off {wait}s (attempt {_retries + 1}/{max_retries})")
+        else:
+            wait = 2 ** _retries
+            logger.error(f"HTTP {status} for {url}. Backing off {wait}s (attempt {_retries + 1}/{max_retries})")
+
+        await asyncio.sleep(wait)
+        return await self.rate_limited_request(url, _retries + 1)
 
     async def fetch_html(self, url):
         """
@@ -124,15 +147,15 @@ class MoviesScraping:
             return {}
 
         soup = BeautifulSoup(html, features="html.parser")
-        movie_header = soup.find('section', attrs={'id': 'featured-film-header'})
+        movie_header = soup.find('section', attrs={'class': 'production-masthead -shadowed -productionscreen -film'})
 
         try:
-            movie_title = movie_header.find('h1').text
+            movie_title = movie_header.find('span', attrs={'class': 'name js-widont prettify'}).text
         except AttributeError:
             movie_title = ''
 
         try:
-            year = int(movie_header.find('small', attrs={'class': 'number'}).find('a').text)
+            year = int(movie_header.find('span', attrs={'class': 'releasedate'}).find('a').text)
         except AttributeError:
             year = None
 
@@ -144,12 +167,12 @@ class MoviesScraping:
             imdb_id = ""
 
         try:
-            themoviedb_link = soup.find("a", attrs={"data-track-action": "TMDb"})['href']
+            themoviedb_link = soup.find("a", attrs={"data-track-action": "TMDB"})['href']
             themoviedb_id = themoviedb_link.split('/movie')[1].strip('/').split('/')[0]
             type_ = "movie"
         except:
             try:
-                themoviedb_link = soup.find("a", attrs={"data-track-action": "TMDb"})['href']
+                themoviedb_link = soup.find("a", attrs={"data-track-action": "TMDB"})['href']
                 themoviedb_id = themoviedb_link.split('/tv')[1].strip('/').split('/')[0]
                 type_ = "tv"
             except:
@@ -176,10 +199,16 @@ class MoviesScraping:
         except:
             fans = 0
 
+        lb_rating = 0
+        image_url = ''
         try:
-            lb_rating = hist_soup.find('span', {'class': 'average-rating'}).find('a').text
+            data_script = soup.find('script', {'type': 'application/ld+json'})
+            raw_json = data_script.string.strip().replace("/* <![CDATA[ */", "").replace("/* ]]> */", "").strip()
+            ld_data = json.loads(raw_json)
+            lb_rating = ld_data.get("aggregateRating", {}).get("ratingValue", 0)
+            image_url = ld_data.get("image", "")
         except:
-            lb_rating = 0
+            pass
 
         try:
             for i, r in enumerate(ratings):
@@ -196,7 +225,6 @@ class MoviesScraping:
             tot_ratings = ""
 
         film_hist["fans"] = fans
-        film_hist["lb_rating"] = lb_rating
         film_hist["total"] = tot_ratings
 
         return {
@@ -209,27 +237,9 @@ class MoviesScraping:
             "imdb_id": imdb_id,
             "tmdb_id": themoviedb_id, 
             "lb_rating": lb_rating, 
-            "histogram": film_hist
+            "histogram": film_hist,
+            "poster_url": image_url
         }
-
-    async def get_movie_poster(self, movie_title_format):
-        """
-        Get movie poster from letterboxd asynchronously
-        """
-        html = await self.fetch_html(self.posters_url.format(movie_title_format))
-        if not html:
-            return {"poster_url": ""}
-
-        soup = BeautifulSoup(html, features="html.parser")
-
-        try:
-            image_url = soup.find('div', attrs={'class': 'film-poster'}).find('img')['src'].split('?')[0]
-            if self.empty_image_url_prefix in image_url:
-                image_url = ''
-        except AttributeError:
-            image_url = ''
-
-        return {"poster_url": image_url}
 
     async def get_movie_genres(self, movie_title_format, key_name):
         """
@@ -260,9 +270,9 @@ class MoviesScraping:
         }
 
         try:
-            async with self.session.get(url, headers=headers) as response:
-                response.raise_for_status()
-                data = await response.json()
+            response = await self.session.get(url, headers=headers)
+            response.raise_for_status()
+            data = response.json()
         except Exception as e:
             logger.error(f"Error fetching TMDb data: {e}")
             return {}
@@ -362,12 +372,6 @@ class MoviesScraping:
                 })
 
         return reviews
-
-    async def fetch_movie_posters(self, movie):
-        """
-        Fetch movie posters asynchronously
-        """
-        return await self.get_movie_poster(movie["movie_title_formatted"])
 
     async def fetch_movies_genres(self, movie, key_name):
         """

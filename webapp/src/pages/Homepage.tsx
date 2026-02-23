@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import Header from "../components/Header.tsx";
-import MovieGrid from "../components/MovieGrid.tsx";
+import HomeMovieGrid from "../components/HomeMovieGrid.tsx";
 import MovieCarousel from "../components/MovieCarousel.tsx";
 import Footer from "../components/Footer.tsx";
 import PosterInfo from "../components/PosterInfo.tsx";
@@ -58,7 +58,7 @@ const Homepage = () => {
                     throw new Error('Failed to fetch recent movies');
                 }
                 const data = await response.json();
-                setRecentMovies(data.movies);
+                setRecentMovies(data);
             } catch (err) {
                 console.error('Error fetching recent movies:', err);
             }
@@ -81,7 +81,7 @@ const Homepage = () => {
                     throw new Error('Failed to fetch popular movies');
                 }
                 const data = await response.json();
-                setPopularMovies(data.movies);
+                setPopularMovies(data);
             } catch (err) {
                 console.error('Error fetching popular movies:', err);
             }
@@ -96,7 +96,7 @@ const Homepage = () => {
             <div className="max-w-screen-xl w-full mx-auto pb-16 flex-1 mt-6 sm:mt-10 px-4">
                 <PosterInfo posters={topPicks}/>
                 <MovieCarousel movies={recentMovies} sectionTitle="Recently recommended"/>
-                <MovieGrid movies={popularMovies} sectionTitle="Trending this week"/>
+                <HomeMovieGrid movies={popularMovies} sectionTitle="Trending this week"/>
             </div>
             <Footer/>
         </div>

@@ -35,10 +35,13 @@ def setup_logger(log_file, service_name="default", level=logging.INFO):
     console_formatter = ColoredFormatter("%(asctime)s - %(levelname)s - %(module)s - %(message)s")
     console_handler.setFormatter(console_formatter)
 
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
+    if not logger.handlers:
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
+
+    logger.propagate = True
 
     return logger
 
 
-logger = setup_logger("logs/base.log")
+logger = setup_logger("/root/letterboxd-movie-rec/logs/base.log")

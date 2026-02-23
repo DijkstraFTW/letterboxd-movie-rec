@@ -89,7 +89,7 @@ function ChartBarMixedDecades({
               tickLine={false}
               tickMargin={10}
               axisLine={false}
-              tickFormatter={(value) => config[value]?.label || value}
+              tickFormatter={(value) => (config[value]?.label ?? value) + 's'}
             />
             <XAxis dataKey={dataKey} type="number" hide />
             <ChartTooltip
@@ -97,14 +97,14 @@ function ChartBarMixedDecades({
               content={({ active, payload }) => {
                 if (active && payload && payload.length) {
                   const entry = payload[0].payload
-                  const value = payload[0].value
+                  const value = Number(payload[0].value ?? 0)
                   const label = config[entry[yKey]]?.label || entry[yKey]
 
                   return (
                     <div className="rounded-lg border bg-background p-3 shadow-sm">
                       <div className="flex flex-col gap-1">
                         <span className="text-sm text-muted-foreground">
-                          the <span className="font-bold">{label}</span> average rating is <span className="font-bold">{value}</span>.
+                          the <span className="font-bold">{label + 's'}</span> average rating is <span className="font-bold">{value.toFixed(2)}</span>
                         </span>
                       </div>
                     </div>
@@ -115,7 +115,6 @@ function ChartBarMixedDecades({
             />
             <Bar dataKey={dataKey} layout="vertical" radius={5}>
               {data.map((entry, index) => {
-                // For zero values, use a very light gray
                 if (entry[dataKey] === 0) {
                   return (
                     <Cell
@@ -125,7 +124,6 @@ function ChartBarMixedDecades({
                   )
                 }
                 const intensity = entry[dataKey] / maxValue
-                // Create gradient from lighter to darker based on intensity
                 const r = Math.round(baseRgb.r + (255 - baseRgb.r) * (1 - intensity))
                 const g = Math.round(baseRgb.g + (255 - baseRgb.g) * (1 - intensity))
                 const b = Math.round(baseRgb.b + (255 - baseRgb.b) * (1 - intensity))
@@ -143,7 +141,7 @@ function ChartBarMixedDecades({
       {legendKey && (
       <CardFooter className="flex-col items-start gap-2 text-sm">
         <div className="flex gap-2 leading-none font-medium">
-          the {topEntry[yKey]}s lead with {topEntry[dataKey]} ({topPercent}%)
+          the {topEntry[yKey]}s lead with {topEntry[dataKey].toFixed(2)} ({topPercent}%)
           <TrendingUp className="h-4 w-4" />
         </div>
         <div className="text-muted-foreground leading-none">{comparisonMessage}</div>

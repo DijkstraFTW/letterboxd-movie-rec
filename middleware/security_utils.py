@@ -7,7 +7,7 @@ from typing import Set, Dict
 from collections import defaultdict, deque
 from app_logger.app_logger import setup_logger
 
-logger = setup_logger("../logs/security.log", "SecurityLogger")
+logger = setup_logger("/root/letterboxd-movie-rec/logs/security.log", "SecurityLogger")
 
 
 class IPBlocker:

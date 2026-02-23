@@ -35,7 +35,6 @@ function BarChartDefaultYears({
   const minYear = Math.min(...years)
   const maxYear = Math.max(...years)
 
-  // build full dataset including missing years
   const fullData = []
   for (let y = minYear; y <= maxYear; y++) {
     const entry = data.find((d) => d[xKey] === y)
@@ -98,7 +97,6 @@ function BarChartDefaultYears({
             />
             <Bar dataKey={dataKey} radius={2}>
               {fullData.map((entry, index) => {
-                // For zero values, use a very light gray
                 if (entry[dataKey] === 0) {
                   return (
                     <Cell
@@ -108,7 +106,6 @@ function BarChartDefaultYears({
                   )
                 }
                 const intensity = entry[dataKey] / maxValue
-                // Create gradient from lighter to darker based on intensity
                 const r = Math.round(baseRgb.r + (255 - baseRgb.r) * (1 - intensity))
                 const g = Math.round(baseRgb.g + (255 - baseRgb.g) * (1 - intensity))
                 const b = Math.round(baseRgb.b + (255 - baseRgb.b) * (1 - intensity))

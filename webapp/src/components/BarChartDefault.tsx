@@ -1,6 +1,6 @@
 "use client"
 
-import { Bar, BarChart, XAxis, Cell } from "recharts"
+import { Bar, BarChart, XAxis, YAxis, Cell } from "recharts"
 
 import {
   Card,
@@ -32,6 +32,8 @@ function BarChartDefault({
   xKey = "month",
 }: BarChartDefaultProps) {
   const maxValue = Math.max(...data.map((d) => d[dataKey]))
+  const minValue = Math.min(...data.map((d) => d[dataKey]))
+  const range = maxValue - minValue || 1
 
   const baseColor = "#10b981"
 
@@ -55,6 +57,7 @@ function BarChartDefault({
       <CardContent>
         <ChartContainer config={config}>
           <BarChart accessibilityLayer data={data}>
+            <YAxis hide domain={[Math.max(0, minValue - range * 0.5), maxValue + range * 0.1]} />
             <XAxis
               dataKey={xKey}
               tickLine={false}
@@ -67,14 +70,14 @@ function BarChartDefault({
               content={({ active, payload }) => {
                 if (active && payload && payload.length) {
                   const entry = payload[0].payload
-                  const value = payload[0].value
+                  const value = Number(payload[0].value ?? 0)
                   const label = entry[xKey]
 
                   return (
                     <div className="rounded-lg border bg-background p-3 shadow-sm">
                       <div className="flex flex-col gap-1">
                         <span className="text-sm text-muted-foreground">
-                          You watched a total of <span className="font-bold">{value}</span> movies on <span className="font-bold">{label}s</span>.
+                          You watch around <span className="font-bold">{value.toFixed(2)}</span> movies on <span className="font-bold">{label}s</span>.
                         </span>
                       </div>
                     </div>
@@ -85,11 +88,11 @@ function BarChartDefault({
             />
             <Bar dataKey={dataKey} radius={8}>
               {data.map((entry, index) => {
-                const intensity = entry[dataKey] / maxValue
-                // Create gradient from lighter to darker based on intensity
-                const r = Math.round(baseRgb.r + (255 - baseRgb.r) * (1 - intensity))
-                const g = Math.round(baseRgb.g + (255 - baseRgb.g) * (1 - intensity))
-                const b = Math.round(baseRgb.b + (255 - baseRgb.b) * (1 - intensity))
+                const intensity = (entry[dataKey] - minValue) / range
+                const dimRgb = { r: Math.round(baseRgb.r * 0.25), g: Math.round(baseRgb.g * 0.25), b: Math.round(baseRgb.b * 0.25) }
+                const r = Math.round(dimRgb.r + (baseRgb.r - dimRgb.r) * intensity)
+                const g = Math.round(dimRgb.g + (baseRgb.g - dimRgb.g) * intensity)
+                const b = Math.round(dimRgb.b + (baseRgb.b - dimRgb.b) * intensity)
                 return (
                   <Cell
                     key={`cell-${index}`}

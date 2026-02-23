@@ -18,7 +18,7 @@ import { Checkbox } from "../../shadcn/components/ui/checkbox.tsx"
 import { Button } from "../../shadcn/components/ui/button.tsx"
 
 interface InputLbRecFormProps {
-  onSubmit: () => void;
+  onSubmit: (username: string, dataOptIn: boolean) => void;
 }
 
 export function InputLbRecForm({ onSubmit }: InputLbRecFormProps) {
@@ -27,10 +27,7 @@ export function InputLbRecForm({ onSubmit }: InputLbRecFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log({ letterboxd_username, data_opt_in })
-    onSubmit()
-    // Replace with your actual API call:
-    // const res = await fetch('/api/recommendations', { ... })
+    onSubmit(letterboxd_username, data_opt_in)
   }
 
   return (

@@ -159,9 +159,28 @@ function ChartBarMixedMostWatched({
               <LabelList
                 dataKey={yKey}
                 position="insideLeft"
-                offset={10}
-                formatter={(value: string) => config[value]?.label || value}
-                className="fill-white font-medium text-xs"
+                content={(props: any) => {
+                  const { x, y, width, height, value } = props
+                  const label: string = config[value]?.label || value || ''
+                  const charWidth = 7
+                  const available = Math.floor((width - 10) / charWidth)
+                  const truncated = label.length > available
+                    ? label.slice(0, Math.max(0, available - 1)) + '…'
+                    : label
+                  if (available <= 0) return null
+                  return (
+                    <text
+                      x={x + 10}
+                      y={y + height / 2}
+                      dominantBaseline="middle"
+                      fill="white"
+                      fontSize={12}
+                      fontWeight={500}
+                    >
+                      {truncated}
+                    </text>
+                  )
+                }}
               />
             </Bar>
           </BarChart>

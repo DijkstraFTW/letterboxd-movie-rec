@@ -3,7 +3,6 @@ import { Button } from "../../shadcn/components/ui/button.tsx";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "../../shadcn/components/ui/dropdown-menu";
@@ -14,9 +13,9 @@ const MIDDLEWARE_HOST = import.meta.env.VITE_MIDDLEWARE_HOST
 const MIDDLEWARE_API_KEY = import.meta.env.VITE_MIDDLEWARE_API_KEY
 
 interface Announcement {
+  id: string;
   title: string;
-  description: string;
-  date: string;
+  message: string;
 }
 
 export default function NotificationsButton() {
@@ -65,33 +64,27 @@ export default function NotificationsButton() {
         </DropdownMenuLabel>
         <DropdownMenuGroup>
           {loading ? (
-            <DropdownMenuItem className="hover:bg-white/5 focus:bg-white/5 pointer-events-none focus:outline-none">
-              <div className="rounded-md bg-[#1e1e1e] p-3 text-center w-full">
-                <div className="text-sm text-white/60">Loading announcements...</div>
-              </div>
-            </DropdownMenuItem>
+            <div className="px-3 py-6 text-center text-sm text-white/40">
+              Loading announcements...
+            </div>
           ) : notifications.length === 0 ? (
-            <DropdownMenuItem className="hover:bg-white/5 focus:bg-white/5 pointer-events-none focus:outline-none">
-              <div className="rounded-md bg-[#1e1e1e] p-3 text-center w-full">
-                <div className="text-sm text-white/60">No new announcements</div>
-              </div>
-            </DropdownMenuItem>
+            <div className="px-3 py-6 text-center text-sm text-white/40">
+              No new announcements
+            </div>
           ) : (
-            notifications.map((notif, index) => (
-              <DropdownMenuItem
-                key={index}
-                className="hover:bg-white/5 focus:bg-white/5 pointer-events-none focus:outline-none"
-              >
-                <div className="rounded-md bg-[#1e1e1e] cursor-pointer [&:not(:last-child)]:mb-2 p-3">
-                  <div className="text-sm text-white/80 font-semibold mb-0.5">
-                    {notif.title}
+            <div className="py-1">
+              {notifications.map((notif, index) => (
+                <div
+                  key={index}
+                  className={`px-3 py-3 ${index !== notifications.length - 1 ? "border-b border-white/5" : ""}`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <span className="text-sm font-semibold text-white leading-tight">{notif.title}</span>
                   </div>
-                  <div className="text-xs text-white/60 leading-snug">
-                    {notif.description}
-                  </div>
+                  <p className="text-xs text-white/50 leading-relaxed">{notif.message}</p>
                 </div>
-              </DropdownMenuItem>
-            ))
+              ))}
+            </div>
           )}
         </DropdownMenuGroup>
       </DropdownMenuContent>
