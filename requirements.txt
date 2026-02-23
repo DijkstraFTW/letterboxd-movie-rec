@@ -18,6 +18,12 @@ tzdata==2023.4
 urllib3==2.1.0
 apache-airflow==2.8.1
 redis==4.1.1
-nltk==3.6.5
 aiohttp
 aiofiles
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+gunicorn==21.2.0
+httpx==0.26.0
+pydantic==2.5.3
+fastapi_cache2==0.1.0
+slowapi==0.1.0

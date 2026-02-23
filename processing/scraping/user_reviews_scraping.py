@@ -2,9 +2,9 @@ import uuid
 import asyncio
 import aiohttp
 from bs4 import BeautifulSoup
-from logger import setup_logger
+from app_logger.app_logger import setup_logger
 
-logger = setup_logger("../logs/factg.log", "UserReviewsScraping")
+logger = setup_logger("../logs/user_reviews_scraping.log", "UserReviewsScraping")
 
 
 class UserReviewsScraping:
@@ -16,7 +16,7 @@ class UserReviewsScraping:
         self.users_diary_pages_url = "https://letterboxd.com/{}/films/diary/by/added/page/{}/"
         self.users_grid_page_number_url = "https://letterboxd.com/{}/films/by/date/"
         self.users_grid_pages_url = "https://letterboxd.com/{}/films/by/date/page/{}/"
-        self.num_top_users_pages = 10
+        self.num_top_users_pages = 67 # 30 users per page, 2010 users total
         self.num_user_ratings_pages = 3
         
         # Concurrency settings
@@ -220,18 +220,18 @@ class UserReviewsScraping:
 
         for review in reviews:
             try:
-                date_element = review.find('td', class_='td-day diary-day center').find("a")["href"].split("/")
+                date_element = review.find('td', class_='col-daydate _aligncenter _paddinginlinelg').find("a")["href"].split("/")
                 date = f"{date_element[-4]}-{date_element[-5]}-{date_element[-6]}"
             except:
                 date = ""
 
             try:
-                movie_title = review.find("div", attrs={"class", "film-poster"})["data-film-slug"]
+                movie_title = review.find("div", attrs={"data-component-class", "LazyPoster"})["data-film-slug"]
             except:
                 continue
 
             try:
-                rating_element = review.find('td', class_='td-rating rating-green')
+                rating_element = review.find('td', class_='col-rating _paddinginlinelg')
                 rating_val = rating_element.find('span')['class'][-1].split("rated-")[-1]
                 if rating_val == "rating":
                     rating_val = 0
@@ -239,16 +239,22 @@ class UserReviewsScraping:
                 rating_val = 0
 
             try:
-                rewatch_element = review.find('td', class_='td-rewatch center').find("span")
+                rewatch_element = review.find('td', class_='col-rewatch _aligncenter _paddinginlinelg js-td-rewatch').find("span")
                 is_rewatch = rewatch_element.has_attr('class') and 'icon-rewatch' in rewatch_element['class']
             except:
                 is_rewatch = False
 
             try:
-                review_element = review.find('td', class_='td-review center').find("a")
+                review_element = review.find('td', class_='col-review _aligncenter _paddinginlinelg js-td-review').find("a")
                 is_reviewed = review_element is not None
             except:
                 is_reviewed = False
+                
+            try:
+                like_element = review.find('td', class_='col-like _aligncenter _paddinginlinelg').find("a")
+                is_liked = like_element is not None
+            except:
+                is_liked = False
 
             rating_object = {
                 "movie_title": movie_title, 
@@ -256,7 +262,8 @@ class UserReviewsScraping:
                 "rating_val": rating_val,
                 "user_id": user_id, 
                 "is_rewatch": is_rewatch, 
-                "is_review": is_reviewed
+                "is_review": is_reviewed,
+                "is_liked": is_liked
             }
             ratings.append(rating_object)
 

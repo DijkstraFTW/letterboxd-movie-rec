@@ -1,89 +1,387 @@
-name: CI/CD
+# name: CI/CD Pipeline
 
-on:
-  push:
-    branches:
-      - main
+# on:
+#   push:
+#     branches:
+#       - main
+#   workflow_dispatch:
 
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.10'
+# env:
+#   VPS_DEPLOY_PATH: /opt/letterboxd-movie-rec
+#   AIRFLOW_HOME: /opt/airflow
+#   WEB_ROOT: /var/www/letterboxd-frontend
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -U scikit-learn
-        python -m pip install -U pip setuptools wheel Cython
-        pip install -U scikit-surprise
-        pip install -r requirements.txt
-        pip check
+# jobs:
+#   test:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v3
 
-    - name: Lint with Flake8
-      run: |
-        pip install flake8
-#        flake8 --ignore=E402 --max-line-length=120  dags --benchmark -v
-#        flake8 --max-line-length=120  database --benchmark -v
-#        flake8 --max-line-length=120  messaging --benchmark -v
-#        flake8 --ignore=W504 --max-line-length=120  prediction/CollaborativeFilteringModel.py --benchmark -v
-#        flake8 --ignore=E722 --max-line-length=120  processing --benchmark -v
-#        flake8 --max-line-length=120  test --benchmark -v
+#       - name: Set up Python
+#         uses: actions/setup-python@v4
+#         with:
+#           python-version: '3.10'
 
-    - name: Test with Pytest
-      run: |
-        pip install pytest
-        cd test
-        pytest dag_tests.py -v
+#       - name: Cache pip dependencies
+#         uses: actions/cache@v3
+#         with:
+#           path: ~/.cache/pip
+#           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
 
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+#       - name: Install dependencies
+#         run: |
+#           python -m pip install --upgrade pip setuptools wheel
+#           pip install -U scikit-learn
+#           pip install -U scikit-surprise
+#           pip install -r requirements.txt
+#           pip check
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+#       - name: Lint with Flake8
+#         run: |
+#           pip install flake8
+#           flake8 --max-line-length=120 --ignore=E402,W504 dags/ database/ messaging/ middleware/ prediction/ processing/ || true
 
-      - name: Modify EC2 security group to allow SSH
-        env:
-          AWS_SG_ID: ${{ secrets.AWS_SG_ID }}
-        run: |
-          MY_IP=$(curl http://checkip.amazonaws.com)
-          aws ec2 authorize-security-group-ingress --group-id ${AWS_SG_ID} --protocol tcp --port 22 --cidr ${MY_IP}/32
+#       - name: Test with Pytest
+#         run: |
+#           pip install pytest
+#           cd test
+#           pytest dag_tests.py -v
 
-      - name: Set up env variables
-        env:
-          ENV: ${{ secrets.ENV }}
-        run: |
-          echo "${{ secrets.ENV }}" >> env
+#   build-frontend:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v3
 
-      - name: Deploy to EC2 using SCP
-        run: |
-          echo "${{ secrets.EC2_SSH_KEY }}" > private_key.pem
-          chmod 400 private_key.pem
-          scp -o StrictHostKeyChecking=no -o ServerAliveInterval=500 -o ServerAliveCountMax=3 -i private_key.pem -r * ${{ secrets.EC2_USER }}@${{ secrets.EC2_IP }}:/home/ubuntu/app/
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=500 -o ServerAliveCountMax=3 -i private_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_IP }} "chmod +x /home/ubuntu/app/deploy.sh && /home/ubuntu/app/deploy.sh"
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v3
+#         with:
+#           node-version: '18'
 
-      - name: Revert EC2 security group changes
-        if: always()
-        env:
-          AWS_SG_ID: ${{ secrets.AWS_SG_ID }}
-        run: |
-          MY_IP=$(curl http://checkip.amazonaws.com)
-          aws ec2 revoke-security-group-ingress --group-id ${AWS_SG_ID} --protocol tcp --port 22 --cidr ${MY_IP}/32
+#       - name: Cache Node modules
+#         uses: actions/cache@v3
+#         with:
+#           path: webapp/node_modules
+#           key: ${{ runner.os }}-node-${{ hashFiles('webapp/package-lock.json') }}
 
-      - name: Delete SSH key
-        if: always()
-        run: |
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=500 -o ServerAliveCountMax=3 -i private_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_IP }} "rm -f /home/ubuntu/app/private_key.pem"
-          rm -f private_key.pem
+#       - name: Install dependencies
+#         working-directory: ./webapp
+#         run: npm ci --prefer-offline --no-audit
+
+#       - name: Build React app
+#         working-directory: ./webapp
+#         run: npm run build
+#         env:
+#           NODE_ENV: production
+
+#       - name: Upload build artifact
+#         uses: actions/upload-artifact@v3
+#         with:
+#           name: react-build
+#           path: webapp/dist/
+#           retention-days: 1
+
+#   deploy:
+#     needs: [test, build-frontend]
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v3
+
+#       - name: Download React build
+#         uses: actions/download-artifact@v3
+#         with:
+#           name: react-build
+#           path: webapp/dist/
+
+#       - name: Setup SSH
+#         run: |
+#           mkdir -p ~/.ssh
+#           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+#           chmod 600 ~/.ssh/deploy_key
+#           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+#       - name: Check VPS Provisioning Status
+#         id: check_provisioned
+#         run: |
+#           if ssh -i ~/.ssh/deploy_key -o ConnectTimeout=10 \
+#                ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+#                "[ -f /opt/letterboxd-provisioned ]"; then
+#             echo "provisioned=true" >> $GITHUB_OUTPUT
+#             echo "VPS is already provisioned"
+#           else
+#             echo "provisioned=false" >> $GITHUB_OUTPUT
+#             echo "VPS needs initial provisioning"
+#           fi
+
+#       - name: Initial VPS Provisioning
+#         if: steps.check_provisioned.outputs.provisioned == 'false'
+#         run: |
+#           # Copy VPS scripts to server
+#           scp -i ~/.ssh/deploy_key -r vps/ \
+#               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/
+
+#           # Run provisioning scripts non-interactively
+#           ssh -i ~/.ssh/deploy_key \
+#               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+#             set -e
+
+#             # Export non-interactive configuration
+#             export DEBIAN_FRONTEND=noninteractive
+#             export VPS_NON_INTERACTIVE=true
+#             export VPS_PROFILE="web"
+#             export REDIS_NON_INTERACTIVE=true
+#             export REDIS_MAXMEMORY="1gb"
+#             export REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD }}"
+#             export ALLOW_REMOTE_ACCESS=false
+#             export AIRFLOW_NON_INTERACTIVE=true
+#             export AIRFLOW_ADMIN_USER="admin"
+#             export AIRFLOW_ADMIN_PASSWORD="${{ secrets.AIRFLOW_ADMIN_PASSWORD }}"
+#             export AIRFLOW_ADMIN_EMAIL="admin@localhost"
+#             export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
+#             export POSTGRES_DB="airflow"
+#             export POSTGRES_USER="airflow"
+#             export AIRFLOW_EXECUTOR="LocalExecutor"
+#             export NGINX_NON_INTERACTIVE=true
+#             export DOMAIN_NAME="${{ secrets.VPS_HOST }}"
+#             export ENABLE_SSL=false
+#             export MONITORING_NON_INTERACTIVE=true
+#             export ENABLE_EMAIL_ALERTS=false
+
+#             cd /tmp/vps
+#             chmod +x *.sh
+
+#             # Run base system hardening
+#             ./base_vps_script.sh
+
+#             # Install PostgreSQL first (required for Airflow)
+#             apt-get update
+#             apt-get install -y postgresql postgresql-contrib
+#             systemctl start postgresql
+#             systemctl enable postgresql
+
+#             # Install services
+#             ./redis.sh
+#             ./airflow.sh
+#             ./nginx.sh
+#             ./monitoring.sh
+
+#             # Mark as provisioned
+#             touch /opt/letterboxd-provisioned
+
+#             echo "Initial provisioning complete"
+#           ENDSSH
+
+#       - name: Create deployment directories
+#         run: |
+#           ssh -i ~/.ssh/deploy_key \
+#               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+#             mkdir -p ${{ env.VPS_DEPLOY_PATH }}/backend
+#             mkdir -p ${{ env.VPS_DEPLOY_PATH }}/logs
+#             mkdir -p ${{ env.VPS_DEPLOY_PATH }}/backups
+#             mkdir -p ${{ env.WEB_ROOT }}
+#           ENDSSH
+
+#       - name: Backup current deployment
+#         run: |
+#           ssh -i ~/.ssh/deploy_key \
+#               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+#             if [ -d ${{ env.VPS_DEPLOY_PATH }}/backend ]; then
+#               BACKUP_DIR=${{ env.VPS_DEPLOY_PATH }}/backups/backend-$(date +%Y%m%d-%H%M%S)
+#               cp -al ${{ env.VPS_DEPLOY_PATH }}/backend $BACKUP_DIR
+#               echo "Backup created: $BACKUP_DIR"
+
+#               # Keep only last 5 backups
+#               cd ${{ env.VPS_DEPLOY_PATH }}/backups
+#               ls -t | grep '^backend-' | tail -n +6 | xargs -r rm -rf
+#             fi
+#           ENDSSH
+
+#       - name: Generate .env file
+#         run: |
+#           ssh -i ~/.ssh/deploy_key \
+#               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+#             cat << EOF > ${{ env.VPS_DEPLOY_PATH }}/backend/.env
+#           MONGO_USERNAME=${{ secrets.MONGO_USERNAME }}
+#           MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }}
+#           MONGO_CLUSTER=${{ secrets.MONGO_CLUSTER }}
+#           MONGO_DATABASE=${{ secrets.MONGO_DATABASE }}
+#           THEMOVIEDB_KEY=${{ secrets.THEMOVIEDB_KEY }}
+#           REDIS_HOST=${{ secrets.REDIS_HOST }}
+#           REDIS_PORT=${{ secrets.REDIS_PORT }}
+#           REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+#           REDIS_DB=0
+#           REDIS_QUEUE_RECS=recs
+#           X-RapidAPI-Key=${{ secrets.RAPIDAPI_KEY }}
+#           X-RapidAPI-Host=${{ secrets.RAPIDAPI_HOST }}
+#           STREAMING_AVAILABILITY_API_URL=https://streaming-availability.p.rapidapi.com/shows/%7Bid%7D
+#           MAX_CONCURRENT=3
+#           REQUESTS_PER_SECONDS=4
+#           AIRFLOW_BASE_URL=http://localhost:8080/api/v1
+#           AIRFLOW_DAG_ID=movie_recommendation_pipeline
+#           AIRFLOW_API_TOKEN=${{ secrets.AIRFLOW_API_TOKEN }}
+#           EOF
+#             chmod 600 ${{ env.VPS_DEPLOY_PATH }}/backend/.env
+#           ENDSSH
+
+#       - name: Deploy backend code
+#         run: |
+#           rsync -avz --delete \
+#             --exclude='venv/' \
+#             --exclude='__pycache__/' \
+#             --exclude='*.pyc' \
+#             --exclude='.git/' \
+#             --exclude='logs/' \
+#             --exclude='webapp/' \
+#             --exclude='vps/' \
+#             --exclude='test/' \
+#             --exclude='.env' \
+#             --exclude='.github/' \
+#             -e "ssh -i ~/.ssh/deploy_key" \
+#             ./ \
+#             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.VPS_DEPLOY_PATH }}/backend/
+
+#       - name: Deploy Airflow DAGs
+#         run: |
+#           rsync -avz --delete \
+#             -e "ssh -i ~/.ssh/deploy_key" \
+#             ./dags/ \
+#             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.AIRFLOW_HOME }}/dags/
+
+#       - name: Deploy frontend build
+#         run: |
+#           rsync -avz --delete \
+#             -e "ssh -i ~/.ssh/deploy_key" \
+#             ./webapp/dist/ \
+#             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.WEB_ROOT }}/
+
+#       - name: Install Python dependencies
+#         run: |
+#           ssh -i ~/.ssh/deploy_key \
+#               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+#             cd ${{ env.VPS_DEPLOY_PATH }}/backend
+
+#             # Create venv if doesn't exist
+#             if [ ! -d venv ]; then
+#               python3 -m venv venv
+#             fi
+
+#             source venv/bin/activate
+#             pip install --upgrade pip setuptools wheel
+#             pip install -U scikit-learn scikit-surprise
+#             pip install -r requirements.txt
+#           ENDSSH
+
+#       - name: Create systemd service for middleware
+#         if: steps.check_provisioned.outputs.provisioned == 'false'
+#         run: |
+#           ssh -i ~/.ssh/deploy_key \
+#               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+#             cat << 'EOF' | sudo tee /etc/systemd/system/letterboxd-middleware.service
+#           [Unit]
+#           Description=Letterboxd Movie Recommender Middleware
+#           After=network.target redis.service postgresql.service
+
+#           [Service]
+#           Type=notify
+#           User=www-data
+#           Group=www-data
+#           WorkingDirectory=${{ env.VPS_DEPLOY_PATH }}/backend
+#           Environment="PATH=${{ env.VPS_DEPLOY_PATH }}/backend/venv/bin"
+#           EnvironmentFile=${{ env.VPS_DEPLOY_PATH }}/backend/.env
+#           ExecStart=${{ env.VPS_DEPLOY_PATH }}/backend/venv/bin/gunicorn \
+#               middleware.middleware:app \
+#               --bind 127.0.0.1:8000 \
+#               --workers 2 \
+#               --worker-class uvicorn.workers.UvicornWorker \
+#               --timeout 120 \
+#               --log-level info
+#           Restart=always
+#           RestartSec=5s
+
+#           [Install]
+#           WantedBy=multi-user.target
+#           EOF
+
+#             sudo systemctl daemon-reload
+#             sudo systemctl enable letterboxd-middleware
+#           ENDSSH
+
+#       - name: Apply Airflow database migrations
+#         run: |
+#           ssh -i ~/.ssh/deploy_key \
+#               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+#             source ${{ env.AIRFLOW_HOME }}/venv/bin/activate
+#             export AIRFLOW_HOME=${{ env.AIRFLOW_HOME }}
+#             airflow db upgrade
+#           ENDSSH
+
+#       - name: Restart services
+#         run: |
+#           ssh -i ~/.ssh/deploy_key \
+#               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+#             # Restart middleware
+#             sudo systemctl restart letterboxd-middleware
+
+#             # Restart Airflow scheduler (for code changes)
+#             sudo systemctl restart airflow-scheduler
+
+#             # Reload Nginx (zero-downtime)
+#             sudo nginx -t && sudo systemctl reload nginx
+
+#             echo "All services restarted"
+#           ENDSSH
+
+#       - name: Wait for services to stabilize
+#         run: sleep 15
+
+#       - name: Health checks
+#         run: |
+#           ssh -i ~/.ssh/deploy_key \
+#               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+#             # Check middleware health
+#             if ! curl -f http://localhost:8000/health; then
+#               echo "Middleware health check failed"
+#               exit 1
+#             fi
+
+#             # Check Airflow
+#             if ! curl -f http://localhost:8080/health; then
+#               echo "Airflow health check failed"
+#               exit 1
+#             fi
+
+#             # Check all services
+#             sudo systemctl is-active letterboxd-middleware || exit 1
+#             sudo systemctl is-active airflow-scheduler || exit 1
+#             sudo systemctl is-active airflow-webserver || exit 1
+#             sudo systemctl is-active nginx || exit 1
+
+#             echo "All health checks passed"
+#           ENDSSH
+
+#       - name: Deployment notification
+#         if: success()
+#         run: |
+#           echo "Deployment successful to ${{ secrets.VPS_HOST }}"
+#           echo "Frontend: http://${{ secrets.VPS_HOST }}"
+#           echo "Airflow: http://${{ secrets.VPS_HOST }}:8080 (via SSH tunnel)"
+
+#       - name: Rollback on failure
+#         if: failure()
+#         run: |
+#           ssh -i ~/.ssh/deploy_key \
+#               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+#             LATEST_BACKUP=$(ls -t ${{ env.VPS_DEPLOY_PATH }}/backups/backend-* 2>/dev/null | head -1)
+
+#             if [ -n "$LATEST_BACKUP" ]; then
+#               echo "Rolling back to $LATEST_BACKUP"
+#               rm -rf ${{ env.VPS_DEPLOY_PATH }}/backend
+#               cp -r $LATEST_BACKUP ${{ env.VPS_DEPLOY_PATH }}/backend
+
+#               sudo systemctl restart letterboxd-middleware
+#               sudo systemctl restart airflow-scheduler
+
+#               echo "Rollback complete"
+#             else
+#               echo "No backup available for rollback"
+#             fi
+#           ENDSSH

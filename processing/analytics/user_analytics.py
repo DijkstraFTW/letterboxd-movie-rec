@@ -3,12 +3,16 @@ import os
 import duckdb
 import pandas as pd
 
-from logger import setup_logger
+from database.mongodb_client import MongoDBClient
+from app_logger.app_logger import setup_logger
 
-logger = setup_logger("../logs/factg.log", "UserAnalytics")
+logger = setup_logger("../logs/user_analytics.log", "UserAnalytics")
 
 
 class UserAnalytics:
+    """
+    Class to perform analytics on user movie reviews and history data using DuckDB
+    """
 
     def __init__(self, db_path, reviews, movies):
         if os.path.exists(db_path):
@@ -53,6 +57,9 @@ class UserAnalytics:
             'themes': str,
             'nanogenres': str
         })
+        mongo_client = MongoDBClient()
+        all_ratings = mongo_client.read_all_ratings()
+        self.set_all_ratings_table(all_ratings)
 
     def set_user_history_reviews(self):
         """
@@ -60,12 +67,12 @@ class UserAnalytics:
         """
         self.conn.execute("""
         CREATE TABLE reviews(
-        movie_title VARCHAR,
-        rating_date VARCHAR,
-        rating_val INTEGER,
-        user_id VARCHAR,
-        is_rewatch BOOLEAN,
-        is_review BOOLEAN
+            movie_title VARCHAR,
+            rating_date VARCHAR,
+            rating_val INTEGER,
+            user_id VARCHAR,
+            is_rewatch BOOLEAN,
+            is_review BOOLEAN
         );
         """)
         self.conn.register('reviews', self.user_reviews)
@@ -76,33 +83,56 @@ class UserAnalytics:
         """
         self.conn.execute("""
         CREATE TABLE movies (
-        movie_title_formatted VARCHAR,
-        movie_title VARCHAR,
-        type VARCHAR,
-        year_released INTEGER,
-        imdb_link VARCHAR,
-        tmdb_link VARCHAR,
-        imdb_id VARCHAR,
-        tmdb_id VARCHAR,
-        lb_rating DECIMAL(2, 1),
-        histogram VARCHAR,
-        poster_url VARCHAR,
-        genres VARCHAR,
-        production_countries VARCHAR,
-        spoken_languages VARCHAR,
-        popularity FLOAT,
-        overview VARCHAR,
-        runtime INTEGER,
-        vote_average FLOAT,
-        vote_count INTEGER,
-        release_date DATE,
-        original_language VARCHAR,
-        last_updated TIMESTAMP,
-        themes VARCHAR,
-        nanogenres VARCHAR
+            movie_title_formatted VARCHAR,
+            movie_title VARCHAR,
+            type VARCHAR,
+            year_released INTEGER,
+            imdb_link VARCHAR,
+            tmdb_link VARCHAR,
+            imdb_id VARCHAR,
+            tmdb_id VARCHAR,
+            lb_rating DECIMAL(2, 1),
+            histogram VARCHAR,
+            poster_url VARCHAR,
+            genres VARCHAR,
+            production_countries VARCHAR,
+            spoken_languages VARCHAR,
+            popularity FLOAT,
+            overview VARCHAR,
+            runtime INTEGER,
+            vote_average FLOAT,
+            vote_count INTEGER,
+            release_date DATE,
+            original_language VARCHAR,
+            last_updated TIMESTAMP,
+            themes VARCHAR,
+            nanogenres VARCHAR
         );
         """)
         self.conn.register('movies', self.user_movies)
+        
+    def set_all_ratings_table(self, all_ratings):
+        """
+        Loads all ratings into DuckDB for cohort analysis
+        """
+        all_ratings_df = pd.DataFrame(all_ratings)
+        all_ratings_df = all_ratings_df.astype({
+            'movie_title': str,
+            'rating_val': float,
+            'user_id': str,
+            'is_review': bool
+        })
+
+        self.conn.execute("""
+        CREATE TABLE all_reviews (
+            movie_title VARCHAR,
+            rating_val DOUBLE,
+            user_id VARCHAR,
+            is_review BOOLEAN
+        );
+        """)
+
+        self.conn.register('all_reviews', all_ratings_df)
 
     def get_basic_metrics(self):
         """
@@ -111,31 +141,44 @@ class UserAnalytics:
         """
 
         movies_reviewed = self.conn.execute("""
-        SELECT COUNT(*) 
-        FROM movies 
-        WHERE type = 'movie';
+            SELECT COUNT(*) 
+            FROM movies 
+            WHERE type = 'movie';
         """).fetchone()[0]
 
         shows_reviewed = self.conn.execute("""
-        SELECT COUNT(*) 
-        FROM movies 
-        WHERE type = 'shows';
+            SELECT COUNT(*) 
+            FROM movies 
+            WHERE type = 'shows';
         """).fetchone()[0]
 
-        hours_watched = self.conn.execute("""
-        SELECT SUM(runtime) 
-        FROM movies;
+        minutes_watched = self.conn.execute("""
+            SELECT SUM(runtime) 
+            FROM movies;
+        """).fetchone()[0]
+
+        first_watches = self.conn.execute("""
+            SELECT COUNT(*) 
+            FROM movies
+            WHERE is_rewatch = FALSE;
+        """).fetchone()[0]
+
+        rewatches = self.conn.execute("""
+            SELECT COUNT(*) 
+            FROM movies
+            WHERE is_rewatch = TRUE;
         """).fetchone()[0]
 
         most_common_countries = self.conn.execute("""
             SELECT country, COUNT(*) AS count
             FROM (
-                SELECT TRIM(unnested_country) AS country
+                SELECT TRIM(REPLACE(REPLACE(unnested_country, '''', ''), '"', '')) AS country
                 FROM (
                     SELECT UNNEST(SPLIT(REPLACE(REPLACE(production_countries, '[', ''), ']', ''), ','))
                     AS unnested_country
                     FROM movies
                 ) AS t
+                WHERE TRIM(unnested_country) != '' AND unnested_country IS NOT NULL
             ) AS countries
             GROUP BY country
             ORDER BY count DESC""").fetchdf().to_dict(orient='records')
@@ -149,7 +192,7 @@ class UserAnalytics:
         ) AS review_counts
         """).fetchone()[0]
 
-        number_daily_reviews_over_mean = self.conn.execute(f"""
+        number_daily_reviews_over_mean = self.conn.execute("""
         SELECT COUNT(*) AS num_days_with_more_than_median_reviews
         FROM (
             SELECT rating_date, COUNT(*) AS num_reviews
@@ -159,344 +202,356 @@ class UserAnalytics:
         ) AS days_with_more_than_median_reviews
         """).fetchone()[0]
 
-        logged_per_release_year = self.conn.execute("""SELECT year_released, COUNT(*) AS num_movies
-        FROM movies
-        GROUP BY year_released
-        ORDER BY year_released
+        logged_per_release_year = self.conn.execute("""
+            WITH movie_years AS (
+                SELECT year_released AS year, COUNT(*) AS num_movies
+                FROM movies
+                GROUP BY year_released
+            ),
+            all_years AS (
+                SELECT MIN(year_released) AS min_year, MAX(year_released) AS max_year
+                FROM movies
+            ),
+            year_span AS (
+                SELECT generate_series((SELECT min_year FROM all_years), (SELECT max_year FROM all_years)) AS year
+            )
+            SELECT 
+                y.year,
+                COALESCE(m.num_movies, 0) AS num_movies
+            FROM year_span y
+            LEFT JOIN movie_years m ON y.year = m.year
+            ORDER BY y.year;
         """).fetchdf().to_dict(orient='records')
 
         logged_per_year = self.conn.execute("""
-        SELECT SUBSTRING(rating_date, -4) AS year, COUNT(*) AS num_reviews
-        FROM reviews
-        GROUP BY year
-        ORDER BY year
+            WITH review_years AS (
+                SELECT CAST(SUBSTRING(rating_date, -4) AS INT) AS year, COUNT(*) AS num_reviews
+                FROM reviews
+                GROUP BY CAST(SUBSTRING(rating_date, -4) AS INT)
+            ),
+            all_years AS (
+                SELECT MIN(CAST(SUBSTRING(rating_date, -4) AS INT)) AS min_year,
+                       MAX(CAST(SUBSTRING(rating_date, -4) AS INT)) AS max_year
+                FROM reviews
+            ),
+            year_span AS (
+                SELECT generate_series((SELECT min_year FROM all_years), (SELECT max_year FROM all_years)) AS year
+            )
+            SELECT 
+                y.year,
+                COALESCE(r.num_reviews, 0) AS num_reviews
+            FROM year_span y
+            LEFT JOIN review_years r ON y.year = r.year
+            ORDER BY y.year;
         """).fetchdf().to_dict(orient='records')
 
         average_rating_per_year = self.conn.execute("""
-        SELECT m.year_released, AVG(CAST(r.rating_val AS DOUBLE)) AS average_rating
-        FROM movies m
-        JOIN reviews r ON m.movie_title_formatted = r.movie_title
-        GROUP BY m.year_released
-        ORDER BY m.year_released
+            SELECT m.year_released, AVG(CAST(r.rating_val AS DOUBLE)) AS average_rating
+            FROM movies m
+            JOIN reviews r ON m.movie_title_formatted = r.movie_title
+            GROUP BY m.year_released
+            ORDER BY m.year_released
         """).fetchdf().to_dict(orient='records')
 
         longest_streak = self.conn.execute("""
-        WITH DateDiffs AS (
-            SELECT
-                user_id,
-                rating_date,
-                LAG(rating_date) OVER (PARTITION BY user_id ORDER BY rating_date) AS prev_date
-            FROM
-                reviews
-        ),
-        Streaks AS (
-            SELECT
-                user_id,
-                rating_date,
-                CASE
-                    WHEN prev_date IS NULL OR DATEDIFF(
-                        'days',
-                        CAST(SUBSTR(prev_date, 7, 4) || '-' ||
-                        SUBSTR(prev_date, 4, 2) || '-' ||
-                        SUBSTR(prev_date, 1, 2) AS DATE),
-                        CAST(SUBSTR(rating_date, 7, 4) || '-' ||
-                        SUBSTR(rating_date, 4, 2) || '-' ||
-                        SUBSTR(rating_date, 1, 2) AS DATE)
-                    ) > 1 THEN 1
-                    ELSE 0
-                END AS new_streak
-            FROM
-                DateDiffs
-        ),
-        StreakGroups AS (
-            SELECT
-                user_id,
-                rating_date,
-                SUM(new_streak) OVER (PARTITION BY user_id ORDER BY rating_date) AS streak_group
-            FROM
-                Streaks
-        ),
-        StreakLengths AS (
-            SELECT
-                user_id,
-                streak_group,
-                COUNT(*) AS streak_length
-            FROM
-                StreakGroups
-            GROUP BY
-                user_id, streak_group
-        ),
-        MaxStreak AS (
-            SELECT
-                MAX(streak_length) AS longest_streak
-            FROM
-                StreakLengths
-        )
+            WITH DateDiffs AS (
+                SELECT
+                    user_id,
+                    rating_date,
+                    LAG(rating_date) OVER (PARTITION BY user_id ORDER BY rating_date) AS prev_date
+                FROM
+                    reviews
+            ),
+            Streaks AS (
+                SELECT
+                    user_id,
+                    rating_date,
+                    CASE
+                        WHEN prev_date IS NULL OR DATEDIFF(
+                            'days',
+                            CAST(SUBSTR(prev_date, 7, 4) || '-' ||
+                            SUBSTR(prev_date, 4, 2) || '-' ||
+                            SUBSTR(prev_date, 1, 2) AS DATE),
+                            CAST(SUBSTR(rating_date, 7, 4) || '-' ||
+                            SUBSTR(rating_date, 4, 2) || '-' ||
+                            SUBSTR(rating_date, 1, 2) AS DATE)
+                        ) > 1 THEN 1
+                        ELSE 0
+                    END AS new_streak
+                FROM
+                    DateDiffs
+            ),
+            StreakGroups AS (
+                SELECT
+                    user_id,
+                    rating_date,
+                    SUM(new_streak) OVER (PARTITION BY user_id ORDER BY rating_date) AS streak_group
+                FROM
+                    Streaks
+            ),
+            StreakLengths AS (
+                SELECT
+                    user_id,
+                    streak_group,
+                    COUNT(*) AS streak_length
+                FROM
+                    StreakGroups
+                GROUP BY
+                    user_id, streak_group
+            ),
+            MaxStreak AS (
+                SELECT
+                    MAX(streak_length) AS longest_streak
+                FROM
+                    StreakLengths
+            )
 
-        SELECT longest_streak FROM MaxStreak;
-
-
+            SELECT longest_streak FROM MaxStreak;
         """).fetchone()[0]
 
         average_rating_decade = self.conn.execute("""
-        SELECT
-            FLOOR(year_released / 10) * 10 AS decade,
-            AVG(CAST(rating_val AS INTEGER)) AS average_rating
-        FROM
-            reviews
-        JOIN
-            movies ON reviews.movie_title = movies.movie_title_formatted
-        GROUP BY
-            FLOOR(year_released / 10) * 10
-        ORDER BY
-            decade;
-        """).fetchdf().to_dict(orient='records')
-
-        average_watched_per_day_of_week = self.conn.execute("""
-        SELECT
-            EXTRACT(ISODOW FROM STRPTIME(rating_date, '%d-%m-%Y')) AS day_of_week,
-            COUNT(*) / COUNT(DISTINCT rating_date) AS average_movies_watched
-        FROM reviews
-        GROUP BY day_of_week
-        ORDER BY day_of_week;
-        """).fetchdf().to_dict(orient='records')
-
-        top_10_movies_decade = self.conn.execute("""
-        WITH DecadeMovies AS (
             SELECT
-                movies.movie_title,
-                movies.year_released,
-                FLOOR(movies.year_released / 10) * 10 AS decade,
-                AVG(CAST(reviews.rating_val AS INTEGER)) AS average_rating
+                FLOOR(year_released / 10) * 10 AS decade,
+                AVG(CAST(rating_val AS INTEGER)) AS average_rating
             FROM
                 reviews
             JOIN
                 movies ON reviews.movie_title = movies.movie_title_formatted
             GROUP BY
-                movies.movie_title, movies.year_released
-        ),
-        RankedMovies AS (
+                FLOOR(year_released / 10) * 10
+            ORDER BY
+                decade;
+        """).fetchdf().to_dict(orient='records')
+
+        average_watched_per_day_of_week = self.conn.execute("""
             SELECT
+                EXTRACT(ISODOW FROM STRPTIME(rating_date, '%d-%m-%Y')) AS day_of_week,
+                COUNT(*) / COUNT(DISTINCT rating_date) AS average_movies_watched
+            FROM reviews
+            GROUP BY day_of_week
+            ORDER BY day_of_week;
+            """).fetchdf().to_dict(orient='records')
+
+        top_10_movies_decade = self.conn.execute("""
+            WITH DecadeMovies AS (
+                SELECT
+                    movies.movie_title,
+                    movies.year_released,
+                    FLOOR(movies.year_released / 10) * 10 AS decade,
+                    AVG(CAST(reviews.rating_val AS INTEGER)) AS average_rating
+                FROM
+                    reviews
+                JOIN
+                    movies ON reviews.movie_title = movies.movie_title_formatted
+                GROUP BY
+                    movies.movie_title, movies.year_released
+            ),
+            RankedMovies AS (
+                SELECT
+                    movie_title,
+                    year_released,
+                    decade,
+                    average_rating,
+                    RANK() OVER (PARTITION BY decade ORDER BY average_rating DESC) AS rating_rank
+                FROM
+                    DecadeMovies
+            )
+
+            SELECT
+                decade,
                 movie_title,
                 year_released,
-                decade,
-                average_rating,
-                RANK() OVER (PARTITION BY decade ORDER BY average_rating DESC) AS rating_rank
+                average_rating
             FROM
-                DecadeMovies
-        )
-
-        SELECT
-            decade,
-            movie_title,
-            year_released,
-            average_rating
-        FROM
-            RankedMovies
-        WHERE
-            rating_rank <= 10
-        ORDER BY
-            decade, average_rating DESC;
-
+                RankedMovies
+            WHERE
+                rating_rank <= 10
+            ORDER BY
+                decade, average_rating DESC;
         """).fetchdf().to_dict(orient='records')
 
         top_10_most_watched = self.conn.execute("""
-        SELECT
-            movie_title,
-            COUNT(*) AS watch_count
-        FROM
-            reviews
-        GROUP BY
-            movie_title
-        ORDER BY
-            watch_count DESC
-        LIMIT 10;
+            SELECT
+                movie_title,
+                COUNT(*) AS watch_count
+            FROM
+                reviews
+            GROUP BY
+                movie_title
+            ORDER BY
+                watch_count DESC
+            LIMIT 10;
         """).fetchdf().to_dict(orient='records')
 
         top_10_greater_than_average_rating = self.conn.execute("""
-        SELECT DISTINCT
-            r.movie_title,
-            r.rating_val,
-            m.vote_average,
-            (CAST(r.rating_val AS FLOAT) - m.vote_average) AS margin
-        FROM
-            reviews r
-        JOIN
-            movies m ON r.movie_title = m.movie_title_formatted
-        WHERE
-            CAST(r.rating_val AS FLOAT) > m.vote_average
-        ORDER BY
-            margin DESC
-        LIMIT 10;
+            SELECT DISTINCT
+                r.movie_title,
+                r.rating_val,
+                m.vote_average,
+                m.poster_url,
+                (CAST(r.rating_val AS FLOAT) - m.vote_average) AS margin
+            FROM
+                reviews r
+            JOIN
+                movies m ON r.movie_title = m.movie_title_formatted
+            WHERE
+                CAST(r.rating_val AS FLOAT) > m.vote_average
+            ORDER BY
+                margin DESC
+            LIMIT 10;
         """).fetchdf().to_dict(orient='records')
 
+        
         top_10_lower_than_average_rating = self.conn.execute("""
-        SELECT DISTINCT
-            r.movie_title,
-            r.rating_val,
-            m.vote_average,
-            (CAST(r.rating_val AS FLOAT) - m.vote_average) AS margin
-        FROM
-            reviews r
-        JOIN
-            movies m ON r.movie_title = m.movie_title_formatted
-        WHERE
-            CAST(r.rating_val AS FLOAT) < m.vote_average
-        ORDER BY
-            margin ASC
-        LIMIT 10;
+            SELECT DISTINCT
+                r.movie_title,
+                r.rating_val,
+                m.vote_average,
+                m.poster_url,
+                (CAST(r.rating_val AS FLOAT) - m.vote_average) AS margin
+            FROM
+                reviews r
+            JOIN
+                movies m ON r.movie_title = m.movie_title_formatted
+            WHERE
+                CAST(r.rating_val AS FLOAT) < m.vote_average
+            ORDER BY
+                margin ASC
+            LIMIT 10;
         """).fetchdf().to_dict(orient='records')
 
         top_10_production_country_by_watch_count = self.conn.execute("""
-        SELECT country, COUNT(*) AS count
-        FROM (
-            SELECT TRIM(unnested_country) AS country
+            SELECT country, COUNT(*) AS count
             FROM (
-                SELECT UNNEST(SPLIT(REPLACE(REPLACE(production_countries, '[', ''), ']', ''), ',')) AS unnested_country
-                FROM movies
-            ) AS t
-        ) AS countries
-        GROUP BY country
-        ORDER BY count DESC
-        LIMIT 10
+                SELECT TRIM(unnested_country) AS country
+                FROM (
+                    SELECT UNNEST(SPLIT(REPLACE(REPLACE(production_countries, '[', ''), ']', ''), ',')) AS unnested_country
+                    FROM movies
+                ) AS t
+            ) AS countries
+            GROUP BY country
+            ORDER BY count DESC
+            LIMIT 10;
         """).fetchdf().to_dict(orient='records')
 
         top_10_spoken_language_by_watch_count = self.conn.execute("""
-        SELECT lang, COUNT(*) AS count
-        FROM (
-            SELECT TRIM(unnested_lang) AS lang
+            SELECT lang, COUNT(*) AS count
             FROM (
-                SELECT UNNEST(SPLIT(REPLACE(REPLACE(spoken_languages, '[', ''), ']', ''), ',')) AS unnested_lang
-                FROM movies
-            ) AS t
-        ) AS languages
-        GROUP BY lang
-        ORDER BY count DESC
-        LIMIT 10
+                SELECT TRIM(unnested_lang) AS lang
+                FROM (
+                    SELECT UNNEST(SPLIT(REPLACE(REPLACE(spoken_languages, '[', ''), ']', ''), ',')) AS unnested_lang
+                    FROM movies
+                ) AS t
+            ) AS languages
+            GROUP BY lang
+            ORDER BY count DESC
+            LIMIT 10;
         """).fetchdf().to_dict(orient='records')
 
         top_10_production_country_by_average_rating = self.conn.execute("""
-        SELECT
-            unnested_country,
-            AVG(CAST(r.rating_val AS FLOAT)) AS average_rating
-        FROM (
             SELECT
-                TRIM(UNNEST(SPLIT(REPLACE(REPLACE(m.production_countries, '[', ''), ']', ''), ',')))
-                AS unnested_country,
-                m.movie_title_formatted
-            FROM movies m
-        ) AS countries
-        JOIN reviews r ON countries.movie_title_formatted = r.movie_title
-        GROUP BY unnested_country
-        ORDER BY average_rating DESC
-        LIMIT 10
+                unnested_country,
+                AVG(CAST(r.rating_val AS FLOAT)) AS average_rating
+            FROM (
+                SELECT
+                    TRIM(UNNEST(SPLIT(REPLACE(REPLACE(m.production_countries, '[', ''), ']', ''), ',')))
+                    AS unnested_country,
+                    m.movie_title_formatted
+                FROM movies m
+            ) AS countries
+            JOIN reviews r ON countries.movie_title_formatted = r.movie_title
+            GROUP BY unnested_country
+            ORDER BY average_rating DESC
+            LIMIT 10;
         """).fetchdf().to_dict(orient='records')
 
         top_10_spoken_countries_by_average_rating = self.conn.execute("""
-        SELECT
-            unnested_lang,
-            AVG(CAST(r.rating_val AS FLOAT)) AS average_rating
-        FROM (
             SELECT
-                TRIM(UNNEST(SPLIT(REPLACE(REPLACE(m.spoken_languages, '[', ''), ']', ''), ','))) AS unnested_lang,
-                m.movie_title_formatted
-            FROM movies m
-        ) AS languages
-        JOIN reviews r ON languages.movie_title_formatted = r.movie_title
-        GROUP BY unnested_lang
-        ORDER BY average_rating DESC
-        LIMIT 10
+                unnested_lang,
+                AVG(CAST(r.rating_val AS FLOAT)) AS average_rating
+            FROM (
+                SELECT
+                    TRIM(UNNEST(SPLIT(REPLACE(REPLACE(m.spoken_languages, '[', ''), ']', ''), ','))) AS unnested_lang,
+                    m.movie_title_formatted
+                FROM movies m
+            ) AS languages
+            JOIN reviews r ON languages.movie_title_formatted = r.movie_title
+            GROUP BY unnested_lang
+            ORDER BY average_rating DESC
+            LIMIT 10;
         """).fetchdf().to_dict(orient='records')
 
         top_10_genres_by_watch_count = self.conn.execute("""
-        SELECT
-            unnested_genre,
-            COUNT(*) AS watch_count
-        FROM (
             SELECT
-                UNNEST(SPLIT(REPLACE(REPLACE(genres, '[', ''), ']', ''), ',')) AS unnested_genre,
-                movies.movie_title_formatted
-            FROM movies
-        ) AS genre_expansion
-        JOIN reviews ON genre_expansion.movie_title_formatted = reviews.movie_title
-        GROUP BY
-            unnested_genre
-        ORDER BY
-            watch_count DESC
-        LIMIT 10;
+                unnested_genre,
+                COUNT(*) AS watch_count
+            FROM (
+                SELECT
+                    UNNEST(SPLIT(REPLACE(REPLACE(genres, '[', ''), ']', ''), ',')) AS unnested_genre,
+                    movies.movie_title_formatted
+                FROM movies
+            ) AS genre_expansion
+            JOIN reviews ON genre_expansion.movie_title_formatted = reviews.movie_title
+            GROUP BY
+                unnested_genre
+            ORDER BY
+                watch_count DESC
+            LIMIT 10;
         """).fetchdf().to_dict(orient='records')
 
         top_10_themes_by_watch_count = self.conn.execute("""
-        SELECT
-            unnested_themes,
-            COUNT(*) AS watch_count
-        FROM (
             SELECT
-                UNNEST(SPLIT(REPLACE(REPLACE(themes, '[', ''), ']', ''), ',')) AS unnested_themes,
-                movies.movie_title_formatted
-            FROM movies
-        ) AS theme_expansion
-        JOIN reviews ON theme_expansion.movie_title_formatted = reviews.movie_title
-        GROUP BY
-            unnested_themes
-        ORDER BY
-            watch_count DESC
-        LIMIT 10;
+                unnested_themes,
+                COUNT(*) AS watch_count
+            FROM (
+                SELECT
+                    UNNEST(SPLIT(REPLACE(REPLACE(themes, '[', ''), ']', ''), ',')) AS unnested_themes,
+                    movies.movie_title_formatted
+                FROM movies
+            ) AS theme_expansion
+            JOIN reviews ON theme_expansion.movie_title_formatted = reviews.movie_title
+            GROUP BY
+                unnested_themes
+            ORDER BY
+                watch_count DESC
+            LIMIT 10;
         """).fetchdf().to_dict(orient='records')
 
         top_10_nanogenres_by_watch_count = self.conn.execute("""
-                SELECT
-            unnested_nanogenres,
-            COUNT(*) AS watch_count
-        FROM (
             SELECT
-                UNNEST(SPLIT(REPLACE(REPLACE(nanogenres, '[', ''), ']', ''), ',')) AS unnested_nanogenres,
-                movies.movie_title_formatted
-            FROM movies
-        ) AS nanogenre_expansion
-        JOIN reviews ON nanogenre_expansion.movie_title_formatted = reviews.movie_title
-        GROUP BY
-            unnested_nanogenres
-        ORDER BY
-            watch_count DESC
-        LIMIT 10;
+                unnested_nanogenres,
+                COUNT(*) AS watch_count
+            FROM (
+                SELECT
+                    UNNEST(SPLIT(REPLACE(REPLACE(nanogenres, '[', ''), ']', ''), ',')) AS unnested_nanogenres,
+                    movies.movie_title_formatted
+                FROM movies
+            ) AS nanogenre_expansion
+            JOIN reviews ON nanogenre_expansion.movie_title_formatted = reviews.movie_title
+            GROUP BY
+                unnested_nanogenres
+            ORDER BY
+                watch_count DESC
+            LIMIT 10;
         """).fetchdf().to_dict(orient='records')
 
-        top_10_genres_by_watch_count = self.conn.execute("""
-                SELECT
-                    unnested_genre,
-                    COUNT(*) AS watch_count
-                FROM (
-                    SELECT
-                        UNNEST(SPLIT(REPLACE(REPLACE(genres, '[', ''), ']', ''), ',')) AS unnested_genre,
-                        movies.movie_title_formatted
-                    FROM movies
-                ) AS genre_expansion
-                JOIN reviews ON genre_expansion.movie_title_formatted = reviews.movie_title
-                GROUP BY
-                    unnested_genre
-                ORDER BY
-                    watch_count DESC
-                LIMIT 10;
-                """).fetchdf().to_dict(orient='records')
-
         top_10_themes_by_watch_count = self.conn.execute("""
+            SELECT
+                unnested_themes,
+                COUNT(*) AS watch_count
+            FROM (
                 SELECT
-                    unnested_themes,
-                    COUNT(*) AS watch_count
-                FROM (
-                    SELECT
-                        UNNEST(SPLIT(REPLACE(REPLACE(themes, '[', ''), ']', ''), ',')) AS unnested_themes,
-                        movies.movie_title_formatted
-                    FROM movies
-                ) AS themes_expansion
-                JOIN reviews ON themes_expansion.movie_title_formatted = reviews.movie_title
-                GROUP BY
-                    unnested_themes
-                ORDER BY
-                    watch_count DESC
-                LIMIT 10;
-                """).fetchdf().to_dict(orient='records')
+                    UNNEST(SPLIT(REPLACE(REPLACE(themes, '[', ''), ']', ''), ',')) AS unnested_themes,
+                    movies.movie_title_formatted
+                FROM movies
+            ) AS themes_expansion
+            JOIN reviews ON themes_expansion.movie_title_formatted = reviews.movie_title
+            GROUP BY
+                unnested_themes
+            ORDER BY
+                watch_count DESC
+            LIMIT 10;
+        """).fetchdf().to_dict(orient='records')
 
         top_10_genres_by_average_rating = self.conn.execute("""
             WITH SplitGenres AS (
@@ -506,71 +561,74 @@ class UserAnalytics:
                     r.rating_val
                 FROM movies m
                 JOIN reviews r ON m.movie_title_formatted = r.movie_title
+            ),
+            AvgRatings AS (
+                SELECT
+                    unnested_genre AS genre,
+                    AVG(CAST(rating_val AS FLOAT)) AS avg_rating
+                FROM SplitGenres
+                GROUP BY unnested_genre
+            )
+            SELECT
+                genre,
+                avg_rating
+            FROM AvgRatings
+            ORDER BY avg_rating DESC
+            LIMIT 10;
+        """).fetchdf().to_dict(orient='records')
+
+        top_10_nanogenres_by_average_rating = self.conn.execute("""
+            WITH SplitNanogenres AS (
+                SELECT
+                    m.movie_title,
+                    UNNEST(SPLIT(REPLACE(REPLACE(nanogenres, '[', ''), ']', ''), ',')) AS unnested_nanogenre,
+                    r.rating_val
+                FROM movies m
+                JOIN reviews r ON m.movie_title_formatted = r.movie_title
                 ),
                 AvgRatings AS (
                     SELECT
-                        unnested_genre AS genre,
+                        unnested_nanogenre AS nanogenre,
                         AVG(CAST(rating_val AS FLOAT)) AS avg_rating
-                    FROM SplitGenres
-                    GROUP BY genre
+                    FROM SplitNanogenres
+                    GROUP BY nanogenre
                 )
                 SELECT
-                    genre,
+                    nanogenre,
                     avg_rating
                 FROM AvgRatings
                 ORDER BY avg_rating DESC
                 LIMIT 10;
-                """).fetchdf().to_dict(orient='records')
-
-        top_10_nanogenres_by_average_rating = self.conn.execute("""
-                    WITH SplitNanogenres AS (
-                        SELECT
-                            m.movie_title,
-                            UNNEST(SPLIT(REPLACE(REPLACE(nanogenres, '[', ''), ']', ''), ',')) AS unnested_nanogenre,
-                            r.rating_val
-                        FROM movies m
-                        JOIN reviews r ON m.movie_title_formatted = r.movie_title
-                        ),
-                        AvgRatings AS (
-                            SELECT
-                                unnested_nanogenre AS nanogenre,
-                                AVG(CAST(rating_val AS FLOAT)) AS avg_rating
-                            FROM SplitNanogenres
-                            GROUP BY nanogenre
-                        )
-                        SELECT
-                            nanogenre,
-                            avg_rating
-                        FROM AvgRatings
-                        ORDER BY avg_rating DESC
-                        LIMIT 10;
-                        """).fetchdf().to_dict(orient='records')
+        """).fetchdf().to_dict(orient='records')
 
         top_10_themes_by_average_rating = self.conn.execute("""
-        WITH SplitThemes AS (
+            WITH SplitThemes AS (
+                SELECT
+                    m.movie_title,
+                    UNNEST(SPLIT(REPLACE(REPLACE(themes, '[', ''), ']', ''), ',')) AS unnested_themes,
+                    r.rating_val
+                FROM movies m
+                JOIN reviews r ON m.movie_title_formatted = r.movie_title
+            ),
+            AvgRatings AS (
+                SELECT
+                    unnested_themes AS theme,
+                    AVG(CAST(rating_val AS FLOAT)) AS avg_rating
+                FROM SplitThemes
+                GROUP BY theme
+            )
             SELECT
-                m.movie_title,
-                UNNEST(SPLIT(REPLACE(REPLACE(themes, '[', ''), ']', ''), ',')) AS unnested_themes,
-                r.rating_val
-            FROM movies m
-            JOIN reviews r ON m.movie_title_formatted = r.movie_title
-        ),
-        AvgRatings AS (
-            SELECT
-                unnested_themes AS theme,
-                AVG(CAST(rating_val AS FLOAT)) AS avg_rating
-            FROM SplitThemes
-            GROUP BY theme
-        )
-        SELECT
-            theme,
-            avg_rating
-        FROM AvgRatings
-        ORDER BY avg_rating DESC
-        LIMIT 10;
-                        """).fetchdf().to_dict(orient='records')
+                theme,
+                avg_rating
+            FROM AvgRatings
+            ORDER BY avg_rating DESC
+            LIMIT 10;
+        """).fetchdf().to_dict(orient='records')
+        
 
-        return {"movies_reviewed": movies_reviewed, "shows_reviewed": shows_reviewed, "hours_watched": hours_watched,
+
+        return {"movies_reviewed": movies_reviewed, "shows_reviewed": shows_reviewed, "minutes_watched": minutes_watched,
+                "first_watches" : first_watches, "rewatches": rewatches,
                 "most_common_countries": most_common_countries, "mean_daily_reviews": mean_daily_reviews,
                 "number_daily_reviews_over_mean": number_daily_reviews_over_mean,
                 "logged_per_release_year": logged_per_release_year, "logged_per_year": logged_per_year,
@@ -590,6 +648,98 @@ class UserAnalytics:
                 "top_10_nanogenres_by_average_rating": top_10_nanogenres_by_average_rating,
                 "top_10_themes_by_average_rating": top_10_themes_by_average_rating,
                 "average_watched_per_day_of_week": average_watched_per_day_of_week}
+        
+    # Personal Analysis
+        
+    def get_rating_vs_public_consensus(self):
+        """
+        Returns a comparison of user ratings vs public consensus ratings with genres.
+        """
+        query = """
+            SELECT 
+                m.movie_title,
+                m.lb_rating AS public_rating,
+                CAST(u.rating_val AS DOUBLE) AS user_rating,
+                UNNEST(m.genres) AS genre
+            FROM user_reviews AS u
+            JOIN movies AS m
+                ON LOWER(REPLACE(u.movie_title, '-', '')) = LOWER(REPLACE(m.formatted_movie_title, '-', ''))
+            WHERE u.is_review = TRUE;
+        """
+        df = self.conn.execute(query).fetchdf()
+        return df.to_dict(orient='records')
+    
+    def get_user_vs_sample_ratings(self, sample_size=40):
+        """
+        Returns the raw rating sequences for the target user and a random sample of other users.
+        Output:
+            [
+                {"user_id": "target_user_id", "ratings": [...]},
+                {"user_id": "sample_user_1", "ratings": [...]},
+                ...
+            ]
+        """
+        target_user_ids = self.user_reviews['user_id'].unique().tolist()
+        target_user_id = target_user_ids[0]
+        
+        query_sample = f"""
+        SELECT DISTINCT user_id
+        FROM all_reviews
+        WHERE is_review = TRUE
+        AND user_id != '{target_user_id}'
+        ORDER BY RANDOM()
+        LIMIT {sample_size};
+        """
+        sample_users_df = self.conn.execute(query_sample).fetchdf()
+        sample_user_ids = sample_users_df['user_id'].tolist()
+        
+        all_user_ids = sample_user_ids + [target_user_id]
+        placeholders = ",".join([f"'{uid}'" for uid in all_user_ids])
+        
+        query_ratings = f"""
+        SELECT user_id, rating_val
+        FROM all_reviews
+        WHERE user_id IN ({placeholders}) AND is_review = TRUE
+        ORDER BY user_id, rating_date;
+        """
+        ratings_df = self.conn.execute(query_ratings).fetchdf()
+        
+        result = []
+        for uid, group in ratings_df.groupby('user_id'):
+            result.append({"user_id": uid, "ratings": group['rating_val'].tolist()})
+        
+        return result
+    
+    def get_popularity_vs_rating(self):
+        """
+        Returns user ratings vs movie popularity (vote_count) for scatter plotting.
+        Output columns:
+            - movie_title_formatted
+            - vote_count (X-axis, can use log scale in plotting)
+            - rating_val (Y-axis)
+            - genres (optional for coloring)
+        """
+        query = """
+        SELECT
+            m.movie_title_formatted,
+            m.vote_count,
+            CAST(u.rating_val AS DOUBLE) AS rating_val
+        FROM reviews u
+        JOIN movies m
+            ON LOWER(REPLACE(u.movie_title, '-', '')) = LOWER(REPLACE(m.formatted_movie_title, '-', ''))
+        WHERE u.is_review = TRUE;
+        """
+        df = self.conn.execute(query).fetchdf()
+        return df.to_dict(orient='records')
+
+
+
+        
+    
+    
+
+        
+        
 
     def close(self):
         self.conn.close()

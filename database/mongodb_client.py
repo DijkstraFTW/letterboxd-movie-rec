@@ -1,161 +1,218 @@
 import os
-
 import certifi
 import numpy as np
 from pymongo import MongoClient
+from app_logger.app_logger import setup_logger
+
+logger = setup_logger("../logs/mongodb_client.log", "MongoDBClient")
 
 
 class MongoDBClient:
+    _instance = None
+    _client = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(MongoDBClient, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
 
     def __init__(self):
-        self.username = os.getenv('MONGO_USERNAME')
-        self.password = os.getenv('MONGO_PASSWORD')
-        self.cluster = os.getenv('MONGO_CLUSTER')
-        self.database = os.getenv('MONGO_DATABASE')
-        self.URI = "mongodb+srv://" + str(self.username) + ':' + str(self.password) + "@" + str(
-            self.cluster) + "/?retryWrites=true&w=majority"
+        if self._initialized:
+            return
+
+        try:
+            self.username = os.getenv('MONGO_USERNAME')
+            self.password = os.getenv('MONGO_PASSWORD')
+            self.cluster = os.getenv('MONGO_CLUSTER')
+            self.database = os.getenv('MONGO_DATABASE')
+            self.URI = f"mongodb+srv://{self.username}:{self.password}@{self.cluster}/?retryWrites=true&w=majority"
+
+            self._client = MongoClient(self.URI, tlsCAFile=certifi.where())
+            self._client.admin.command('ping')
+
+            self._initialized = True
+            logger.info(f"MongoDBClient singleton initialized for database '{self.database}' at cluster '{self.cluster}'.")
+        except Exception as e:
+            logger.error(f"Error initializing MongoDBClient: {e}", exc_info=True)
+            raise
+
+    @property
+    def client(self):
+        """Property to access the MongoDB client."""
+        if self._client is None:
+            raise RuntimeError("MongoDBClient not properly initialized")
+        return self._client
 
     def open_conn_to_db(self):
-        try:
-            client = MongoClient(self.URI, tlsCAFile=certifi.where())
-            client.admin.command('ping')
-            print("Successfully connected to MongoDB instance!")
-            return client
-        except Exception as e:
-            print("Error disconnecting from MongoDB : " + str(e))
-            return None
+        """Deprecated: Returns the singleton client for backward compatibility."""
+        logger.warning("open_conn_to_db() is deprecated. Use MongoDBClient().client instead.")
+        return self.client
 
     def close_conn_to_db(self, client):
-        try:
-            client.close()
-            print("Successfully disconnected to MongoDB instance!")
-            return "OK"
-        except Exception as e:
-            print("Error disconnecting from MongoDB : " + str(e))
-            return None
+        """Deprecated: No-op for backward compatibility. Connection is managed by singleton."""
+        logger.warning("close_conn_to_db() is deprecated. Connection is managed by the singleton pattern.")
+        return "OK"
 
-    def insert_ratings(self, client, ratings):
+    def insert_ratings(self, ratings, client=None):
         try:
-            collection = client[str(self.database)].ratings
+            collection = self.client[self.database].ratings
             for rating in ratings:
                 collection.insert_one(rating)
-            print("Successfully added {} ratings to MongoDB instance!".format(len(ratings)))
+            logger.info(f"Successfully added {len(ratings)} ratings to MongoDB.")
         except Exception as e:
-            print("Error adding ratings to MongoDB : " + str(e))
+            logger.error(f"Error adding ratings to MongoDB: {e}", exc_info=True)
 
-    def read_all_ratings(self, client):
+    def read_all_ratings(self, client=None):
         try:
-            collection = client[str(self.database)].ratings
+            collection = self.client[self.database].ratings
             result = list(collection.find())
-            # TODO: Remove this line once the data is clean
             result = [item for item in result if item["rating_val"] != "rating"]
+            logger.info(f"Fetched {len(result)} ratings from MongoDB.")
             return result
         except Exception as e:
-            print("Error reading all movies from MongoDB: " + str(e))
+            logger.error(f"Error reading ratings from MongoDB: {e}", exc_info=True)
             return []
 
-    def insert_movies(self, client, movie):
+    def insert_movies(self, movie, client=None):
         try:
-            collection = client[str(self.database)].movies
+            collection = self.client[self.database].movies
             collection.insert_one(movie)
-            print("Successfully added {} movie data to MongoDB instance!".format(movie["movie_title_formatted"]))
+            logger.info(f"Inserted movie '{movie.get('movie_title_formatted', 'Unknown')}' into MongoDB.")
         except Exception as e:
-            print(
-                "Error adding {} : {} movie to MongoDB : " + str(e).format(movie["movie_title"], movie["release_date"]))
+            logger.error(f"Error inserting movie '{movie.get('movie_title', 'Unknown')}': {e}", exc_info=True)
 
-    def read_all_movies_title_formatted(self, client):
+    def read_all_movies_title_formatted(self, client=None):
         try:
-            collection = client[str(self.database)].movies
-            result = collection.find()
-            result = [item["movie_title_formatted"] for item in result]
+            collection = self.client[self.database].movies
+            result = [item["movie_title_formatted"] for item in collection.find()]
+            logger.info(f"Fetched {len(result)} movie titles from MongoDB.")
             return set(result)
         except Exception as e:
-            print("Error reading all movies from MongoDB: " + str(e))
-            return {}
+            logger.error(f"Error reading all movies from MongoDB: {e}", exc_info=True)
+            return set()
 
-    def read_all_rated_movies(self, client):
+    def read_all_movies(self, client=None):
         try:
-            collection = client[str(self.database)].ratings
-            result = collection.find()
-            result = [item["movie_title"] for item in result]
-            return list(set(result))
-        except Exception as e:
-            print("Error reading all rated movies from MongoDB: " + str(e))
-            return []
-
-    def read_movie(self, client, movie_title):
-        query = {"movie_title_formatted": movie_title}
-        try:
-            collection = client[str(self.database)].movies
-            result = collection.find_one(query)
-            result.pop('_id', None)
+            collection = self.client[self.database].movies
+            result = list(collection.find())
+            for item in result:
+                item.pop('_id', None)
+            logger.info(f"Fetched {len(result)} movies from MongoDB.")
             return result
         except Exception as e:
-            print("Error reading movie from MongoDB: " + str(e))
+            logger.error(f"Error reading all movies from MongoDB: {e}", exc_info=True)
+            return []
+
+    def read_all_rated_movies(self, client=None):
+        try:
+            collection = self.client[self.database].ratings
+            result = list({item["movie_title"] for item in collection.find()})
+            logger.info(f"Fetched {len(result)} rated movies from MongoDB.")
+            return result
+        except Exception as e:
+            logger.error(f"Error reading rated movies from MongoDB: {e}", exc_info=True)
+            return []
+
+    def read_movie(self, movie_title, client=None):
+        try:
+            collection = self.client[self.database].movies
+            result = collection.find_one({"movie_title_formatted": movie_title})
+            if result:
+                result.pop('_id', None)
+                logger.info(f"Read movie '{movie_title}' from MongoDB.")
+            else:
+                logger.warning(f"Movie '{movie_title}' not found in MongoDB.")
+            return result
+        except Exception as e:
+            logger.error(f"Error reading movie '{movie_title}' from MongoDB: {e}", exc_info=True)
             return None
 
-    def insert_users(self, client, users):
+    def read_movies_by_titles(self, movie_titles, client=None):
+        """
+        Fetch multiple movies by their titles in a single query.
+        Efficient for enriching recommendation results.
+
+        :param movie_titles: List of movie titles to fetch
+        :return: List of movie documents
+        """
         try:
-            collection = client[str(self.database)].users
+            collection = self.client[self.database].movies
+            # Use $in operator for efficient bulk query
+            results = list(collection.find({"movie_title_formatted": {"$in": movie_titles}}))
+
+            # Remove MongoDB _id field
+            for result in results:
+                result.pop('_id', None)
+
+            logger.info(f"Fetched {len(results)} movies out of {len(movie_titles)} requested from MongoDB.")
+            return results
+        except Exception as e:
+            logger.error(f"Error reading movies by titles from MongoDB: {e}", exc_info=True)
+            return []
+
+    def insert_users(self, users, client=None):
+        try:
+            collection = self.client[self.database].users
             for user in users:
                 collection.insert_one(user)
-            print("Successfully added {} users to MongoDB instance!".format(len(users)))
+            logger.info(f"Successfully added {len(users)} users to MongoDB.")
         except Exception as e:
-            print("Error adding users to MongoDB : " + str(e))
+            logger.error(f"Error inserting users into MongoDB: {e}", exc_info=True)
 
-    def find_user(self, client, username):
-        query = {"username": username}
+    def find_user(self, username, client=None):
         try:
-            collection = client[str(self.database)].users
-            result = collection.count_documents(query)
+            collection = self.client[self.database].users
+            result = collection.count_documents({"username": username})
+            logger.info(f"Found {result} entries for username '{username}'.")
             return result
         except Exception as e:
-            print("Error reading all users from MongoDB: " + str(e))
+            logger.error(f"Error finding user '{username}' in MongoDB: {e}", exc_info=True)
             return None
 
-    def get_user_custom_id(self, client, username):
-        query = {"username": username}
+    def get_user_custom_id(self, username, client=None):
         try:
-            collection = client[str(self.database)].users
-            result = collection.find_one(query)
+            collection = self.client[self.database].users
+            result = collection.find_one({"username": username})
             if result:
+                logger.info(f"Retrieved user_id for username '{username}'.")
                 return result.get('user_id')
             else:
-                print("No user found with username:", username)
+                logger.warning(f"No user found with username '{username}'.")
                 return None
         except Exception as e:
-            print("Error getting user_id from MongoDB: " + str(e))
+            logger.error(f"Error getting user_id for '{username}' from MongoDB: {e}", exc_info=True)
             return None
 
-    def get_reviews_by_user_id(self, client, user_id):
-        query = {"user_id": user_id}
+    def get_reviews_by_user_id(self, user_id, client=None):
         try:
-            collection = client[self.database].reviews
-            result = collection.find(query)
+            collection = self.client[self.database].reviews
+            result = list(collection.find({"user_id": user_id}))
+            logger.info(f"Fetched {len(result)} reviews for user_id '{user_id}'.")
             return result
         except Exception as e:
-            print("Error getting reviews from MongoDB: " + str(e))
+            logger.error(f"Error getting reviews for user_id '{user_id}' from MongoDB: {e}", exc_info=True)
             return []
 
-    def delete_all_ratings(self, client):
+    def delete_all_ratings(self, client=None):
         try:
-            collection = client[self.database].ratings
-            collection.delete_many({})
-            print("Successfully deleted all ratings from MongoDB instance!")
+            collection = self.client[self.database].ratings
+            deleted_count = collection.delete_many({}).deleted_count
+            logger.info(f"Deleted {deleted_count} ratings from MongoDB.")
         except Exception as e:
-            print("Error deleting all ratings from MongoDB : " + str(e))
+            logger.error(f"Error deleting all ratings from MongoDB: {e}", exc_info=True)
 
-    def delete_all_users(self, client):
+    def delete_all_users(self, client=None):
         try:
-            collection = client[self.database].users
-            collection.delete_many({})
-            print("Successfully deleted all users from MongoDB instance!")
+            collection = self.client[self.database].users
+            deleted_count = collection.delete_many({}).deleted_count
+            logger.info(f"Deleted {deleted_count} users from MongoDB.")
         except Exception as e:
-            print("Error deleting all users from MongoDB : " + str(e))
+            logger.error(f"Error deleting all users from MongoDB: {e}", exc_info=True)
 
-    def insert_embeddings(self, client, embeddings, df_merged):
+    def insert_embeddings(self, embeddings, df_merged, client=None):
         try:
-            collection = client[str(self.database)].movies_embeddings
+            collection = self.client[self.database].movies_embeddings
             for idx, embedding in enumerate(embeddings):
                 identifier = df_merged["movie_title_formatted"][idx]
                 normalized_embedding = embedding / np.linalg.norm(embedding)
@@ -164,6 +221,6 @@ class MongoDBClient:
                     'embedding': normalized_embedding.tolist()
                 }
                 collection.insert_one(document)
-            print("Successfully added {} users to MongoDB instance!".format(len(embeddings)))
+            logger.info(f"Successfully inserted {len(embeddings)} embeddings into MongoDB.")
         except Exception as e:
-            print("Error adding users to MongoDB : " + str(e))
+            logger.error(f"Error inserting embeddings into MongoDB: {e}", exc_info=True)

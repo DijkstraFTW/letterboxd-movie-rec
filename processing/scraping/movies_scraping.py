@@ -1,4 +1,5 @@
 import datetime
+import time
 import os
 import re
 import asyncio
@@ -6,9 +7,9 @@ import aiohttp
 from bs4 import BeautifulSoup
 
 from processing.utils.utils import val2stars
-from logger import setup_logger
+from app_logger.app_logger import setup_logger
 
-logger = setup_logger("../logs/factg.log", "MoviesScraping")
+logger = setup_logger("../logs/movies_scraping.log", "MoviesScraping")
 
 
 class MoviesScraping:
@@ -26,10 +27,10 @@ class MoviesScraping:
         self.movies_list = movies_list
         
         # Concurrency settings
-        self.max_concurrent = max_concurrent
-        self.requests_per_second = requests_per_second
-        self.delay_between_requests = 1.0 / requests_per_second
-        self.semaphore = asyncio.Semaphore(max_concurrent)
+        self.max_concurrent = os.getenv("MAX_CONCURRENT")
+        self.requests_per_second = os.getenv("REQUESTS_PER_SECONDS")
+        self.delay_between_requests = 1.0 / os.getenv("REQUESTS_PER_SECONDS")
+        self.semaphore = asyncio.Semaphore(os.getenv("MAX_CONCURRENT"))
         self.last_request_time = 0
         self.session = None
 
@@ -91,13 +92,13 @@ class MoviesScraping:
         """
         Process movies in batches
         """
-        print(f"Getting {len(self.movies_list)} rated movies in batches of {batch_size}")
+        logger.info(f"Getting {len(self.movies_list)} rated movies in batches of {batch_size}")
         
         all_results = []
         
         for i in range(0, len(self.movies_list), batch_size):
             batch = self.movies_list[i:i + batch_size]
-            print(f"Processing batch {i//batch_size + 1}/{(len(self.movies_list)-1)//batch_size + 1}")
+            logger.info(f"Processing batch {i//batch_size + 1}/{(len(self.movies_list)-1)//batch_size + 1}")
             
             tasks = [
                 self.get_letterboxd_movies(self.movies_url.format(movie), movie)
@@ -382,4 +383,3 @@ class MoviesScraping:
             url = self.themoviedb_url.format(type, movie["tmdb_id"])
             return await self.get_themoviedb_data(url)
         return {}
-

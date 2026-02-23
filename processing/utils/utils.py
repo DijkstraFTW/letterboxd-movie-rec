@@ -1,28 +1,11 @@
 import string
 import os
-import datetime
+import re
+import pickle
+from pathlib import Path
+from datetime import datetime
 
 import numpy as np
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-
-
-def remove_stopwords(text):
-    """
-    Removes stopwords and punctuation from a string
-    :return: str : the text filtered
-    """
-
-    words = word_tokenize(str(text))
-    stop_words = set(stopwords.words('english'))
-    filtered_words = [word for word in words if word.lower() not in stop_words]
-    filtered_text = ' '.join(filtered_words)
-    translator = str.maketrans('', '', string.punctuation)
-    filtered_text = filtered_text.translate(translator)
-    filtered_text = filtered_text.replace("  ", " ")
-
-    return filtered_text
-
 
 def create_bag_of_words(x):
     """
@@ -74,19 +57,17 @@ def default_converter(obj):
         return int(obj)
     raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
 
-def load_latest_model(models_dir: str):
+def load_latest_model(models_dir: str = "../prediction/models"):
     """
     Automatically loads the latest model based on filename pattern containing month and year.
-    
+
     Args:
-        models_dir (str): Directory containing model files
-        pattern (str): Filename pattern to match (e.g., "svd_model_*_*.pkl")
-    
+        models_dir (str): Directory containing model files (default: "../prediction/models")
+
     Returns:
         Loaded model object or None if no model found
     """
-    models_dir="../prediction/models"
-    pattern="svd_model_*_*.pkl"
+    pattern = "svd_model_*_*.pkl"
     models_path = Path(models_dir)
     model_files = list(models_path.glob(pattern))
     
