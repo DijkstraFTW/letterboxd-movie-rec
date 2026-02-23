@@ -454,7 +454,7 @@ Environment="AIRFLOW_HOME=${AIRFLOW_HOME}"
 User=${AIRFLOW_USER}
 Group=${AIRFLOW_USER}
 Type=simple
-ExecStart=${AIRFLOW_HOME}/venv/bin/airflow webserver --port ${AIRFLOW_PORT}
+ExecStart=${AIRFLOW_HOME}/venv/bin/airflow webserver --port ${AIRFLOW_PORT} --hostname 127.0.0.1
 Restart=on-failure
 RestartSec=5s
 PrivateTmp=true
@@ -545,12 +545,12 @@ start_services() {
 
 configure_firewall() {
     log "Configuring firewall..."
-    
+
     if command -v ufw &> /dev/null; then
-        sudo ufw allow ${AIRFLOW_PORT}/tcp
-        success "Firewall configured - port ${AIRFLOW_PORT} opened"
+        info "Airflow is bound to localhost only - no firewall rule needed"
+        info "Access the UI via SSH tunnel: ssh -L ${AIRFLOW_PORT}:127.0.0.1:${AIRFLOW_PORT} user@your-vps-ip"
     else
-        warn "UFW not found. Please manually open port ${AIRFLOW_PORT}"
+        warn "UFW not found."
     fi
 }
 
