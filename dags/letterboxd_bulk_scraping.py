@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from database.mongodb_client import MongoDBClient
 from processing.scraping.movies_scraping import MoviesScraping
 from processing.scraping.user_reviews_scraping import UserReviewsScraping
-from middleware.middleware import MiddlewareService, middleware_service
+from middleware.middleware import MiddlewareService
 from airflow.decorators import dag, task
 from dotenv import load_dotenv
 from app_logger.app_logger import setup_logger

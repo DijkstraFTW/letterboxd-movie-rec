@@ -34,6 +34,7 @@ EXECUTOR="LocalExecutor"  # LocalExecutor or CeleryExecutor
 INSTALL_REDIS=false
 REDIS_HOST="localhost"
 REDIS_PORT="6379"
+DB_BACKEND="sqlite"  # postgres or sqlite
 
 # --- HELPER FUNCTIONS ---
 
@@ -67,18 +68,22 @@ check_root() {
 }
 
 check_postgres() {
+    if [ "$DB_BACKEND" != "postgres" ]; then
+        return
+    fi
+
     if ! command -v psql &> /dev/null; then
         error "PostgreSQL is not installed. Please install PostgreSQL first."
         echo "Run: sudo apt install postgresql postgresql-contrib"
         exit 1
     fi
-    
+
     if ! sudo systemctl is-active --quiet postgresql; then
         error "PostgreSQL is not running. Please start PostgreSQL first."
         echo "Run: sudo systemctl start postgresql"
         exit 1
     fi
-    
+
     success "PostgreSQL detected and running"
 }
 
@@ -94,22 +99,30 @@ configure_settings() {
     if [ "${AIRFLOW_NON_INTERACTIVE:-false}" = "true" ]; then
         info "Running in non-interactive mode"
 
-        # Executor selection from env var or default
-        if [ "${AIRFLOW_EXECUTOR:-LocalExecutor}" = "CeleryExecutor" ]; then
-            EXECUTOR="CeleryExecutor"
-            INSTALL_REDIS=true
-            info "CeleryExecutor selected - Redis support will be configured"
+        # Database backend selection from env var or default
+        DB_BACKEND="${AIRFLOW_DB_BACKEND:-postgres}"
+        if [ "$DB_BACKEND" = "sqlite" ]; then
+            EXECUTOR="SequentialExecutor"
+            warn "SQLite selected - using SequentialExecutor (not for production use)"
         else
-            EXECUTOR="LocalExecutor"
-            info "LocalExecutor selected"
-        fi
+            DB_BACKEND="postgres"
+            # Executor selection from env var or default
+            if [ "${AIRFLOW_EXECUTOR:-LocalExecutor}" = "CeleryExecutor" ]; then
+                EXECUTOR="CeleryExecutor"
+                INSTALL_REDIS=true
+                info "CeleryExecutor selected - Redis support will be configured"
+            else
+                EXECUTOR="LocalExecutor"
+                info "LocalExecutor selected"
+            fi
 
-        # PostgreSQL configuration from env vars with defaults
-        POSTGRES_HOST="${POSTGRES_HOST:-localhost}"
-        POSTGRES_PORT="${POSTGRES_PORT:-5432}"
-        POSTGRES_DB="${POSTGRES_DB:-airflow}"
-        POSTGRES_USER="${POSTGRES_USER:-airflow}"
-        POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-24)}"
+            # PostgreSQL configuration from env vars with defaults
+            POSTGRES_HOST="${POSTGRES_HOST:-localhost}"
+            POSTGRES_PORT="${POSTGRES_PORT:-5432}"
+            POSTGRES_DB="${POSTGRES_DB:-airflow}"
+            POSTGRES_USER="${POSTGRES_USER:-airflow}"
+            POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-24)}"
+        fi
 
         # Admin user configuration from env vars with defaults
         AIRFLOW_ADMIN_USER="${AIRFLOW_ADMIN_USER:-admin}"
@@ -129,26 +142,46 @@ configure_settings() {
         return
     fi
 
-    # Interactive mode (original behavior)
-    # Executor selection
-    echo -e "${YELLOW}Executor Selection:${NC}"
-    echo "  1) LocalExecutor - Single machine, simpler (recommended for most)"
-    echo "  2) CeleryExecutor - Distributed, requires Redis/RabbitMQ"
+    # Interactive mode
+    # Database backend selection
+    echo -e "${YELLOW}Database Backend:${NC}"
+    echo "  1) PostgreSQL - Production-ready, recommended"
+    echo "  2) SQLite     - No setup required, dev/testing only (forces SequentialExecutor)"
     echo
-    read -p "Select executor (1-2) [1]: " executor_choice
-    executor_choice=${executor_choice:-1}
+    read -p "Select database backend (1-2) [1]: " db_choice
+    db_choice=${db_choice:-1}
 
-    if [ "$executor_choice" = "2" ]; then
-        EXECUTOR="CeleryExecutor"
-        INSTALL_REDIS=true
-        info "CeleryExecutor selected - Redis support will be configured"
+    if [ "$db_choice" = "2" ]; then
+        DB_BACKEND="sqlite"
+        EXECUTOR="SequentialExecutor"
+        warn "SQLite selected - only suitable for development/testing, not production"
+        echo
     else
-        EXECUTOR="LocalExecutor"
-        info "LocalExecutor selected"
+        DB_BACKEND="postgres"
     fi
-    echo
 
-    # PostgreSQL configuration
+    # Executor selection (only relevant for PostgreSQL backend)
+    if [ "$DB_BACKEND" = "postgres" ]; then
+        echo -e "${YELLOW}Executor Selection:${NC}"
+        echo "  1) LocalExecutor - Single machine, simpler (recommended for most)"
+        echo "  2) CeleryExecutor - Distributed, requires Redis/RabbitMQ"
+        echo
+        read -p "Select executor (1-2) [1]: " executor_choice
+        executor_choice=${executor_choice:-1}
+
+        if [ "$executor_choice" = "2" ]; then
+            EXECUTOR="CeleryExecutor"
+            INSTALL_REDIS=true
+            info "CeleryExecutor selected - Redis support will be configured"
+        else
+            EXECUTOR="LocalExecutor"
+            info "LocalExecutor selected"
+        fi
+        echo
+    fi
+
+    # PostgreSQL configuration (only when postgres backend selected)
+    if [ "$DB_BACKEND" = "postgres" ]; then
     echo -e "${YELLOW}PostgreSQL Database Configuration:${NC}"
     read -p "PostgreSQL host [localhost]: " pg_host
     POSTGRES_HOST=${pg_host:-localhost}
@@ -177,6 +210,7 @@ configure_settings() {
         fi
     done
     echo
+    fi
 
     # Admin user configuration
     echo -e "${YELLOW}Airflow Admin User Configuration:${NC}"
@@ -291,12 +325,19 @@ install_airflow() {
     local PYTHON_VERSION_SHORT=$(python3 --version | awk '{print $2}' | cut -d. -f1,2)
     local CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION_SHORT}.txt"
     
-    # Install Airflow with PostgreSQL support
+    # Install Airflow with appropriate extras
+    local AIRFLOW_EXTRAS
+    if [ "$DB_BACKEND" = "sqlite" ]; then
+        AIRFLOW_EXTRAS="apache-airflow==${AIRFLOW_VERSION}"
+    else
+        AIRFLOW_EXTRAS="apache-airflow[postgres,celery,redis]==${AIRFLOW_VERSION}"
+    fi
+
     sudo -u "$AIRFLOW_USER" bash -c "
         source $AIRFLOW_HOME/venv/bin/activate
         export AIRFLOW_HOME=$AIRFLOW_HOME
         pip install --upgrade pip
-        pip install 'apache-airflow[postgres,celery,redis]==${AIRFLOW_VERSION}' --constraint '${CONSTRAINT_URL}'
+        pip install '${AIRFLOW_EXTRAS}' --constraint '${CONSTRAINT_URL}'
     "
     
     success "Apache Airflow installed"
@@ -321,7 +362,12 @@ configure_airflow() {
     local AIRFLOW_CFG="$AIRFLOW_HOME/airflow.cfg"
     
     # Database connection
-    local SQL_ALCHEMY_CONN="postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
+    local SQL_ALCHEMY_CONN
+    if [ "$DB_BACKEND" = "sqlite" ]; then
+        SQL_ALCHEMY_CONN="sqlite:///${AIRFLOW_HOME}/airflow.db"
+    else
+        SQL_ALCHEMY_CONN="postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
+    fi
     sudo -u "$AIRFLOW_USER" sed -i "s|^sql_alchemy_conn = .*|sql_alchemy_conn = ${SQL_ALCHEMY_CONN}|" "$AIRFLOW_CFG"
     
     # Executor
@@ -388,12 +434,20 @@ create_admin_user() {
 create_systemd_services() {
     log "Creating systemd services..."
     
+    # Build systemd dependency line depending on backend
+    local DB_AFTER_LINE="After=network.target"
+    local DB_WANTS_LINE=""
+    if [ "$DB_BACKEND" = "postgres" ]; then
+        DB_AFTER_LINE="After=network.target postgresql.service"
+        DB_WANTS_LINE="Wants=postgresql.service"
+    fi
+
     # Webserver service
     cat << EOF | sudo tee /etc/systemd/system/airflow-webserver.service > /dev/null
 [Unit]
 Description=Airflow webserver daemon
-After=network.target postgresql.service
-Wants=postgresql.service
+${DB_AFTER_LINE}
+${DB_WANTS_LINE}
 
 [Service]
 Environment="AIRFLOW_HOME=${AIRFLOW_HOME}"
@@ -408,13 +462,13 @@ PrivateTmp=true
 [Install]
 WantedBy=multi-user.target
 EOF
-    
+
     # Scheduler service
     cat << EOF | sudo tee /etc/systemd/system/airflow-scheduler.service > /dev/null
 [Unit]
 Description=Airflow scheduler daemon
-After=network.target postgresql.service
-Wants=postgresql.service
+${DB_AFTER_LINE}
+${DB_WANTS_LINE}
 
 [Service]
 Environment="AIRFLOW_HOME=${AIRFLOW_HOME}"
@@ -567,7 +621,9 @@ main() {
     install_dependencies
     create_airflow_user
     setup_directories
-    setup_postgres_database
+    if [ "$DB_BACKEND" = "postgres" ]; then
+        setup_postgres_database
+    fi
     install_airflow
     configure_airflow
     create_admin_user
@@ -596,17 +652,20 @@ Web UI:
 - Username: ${AIRFLOW_ADMIN_USER}
 - Password: ${AIRFLOW_ADMIN_PASSWORD}
 
-PostgreSQL Database:
-- Host: ${POSTGRES_HOST}
-- Port: ${POSTGRES_PORT}
-- Database: ${POSTGRES_DB}
-- User: ${POSTGRES_USER}
-- Password: ${POSTGRES_PASSWORD}
+Database Backend: ${DB_BACKEND}
+$(if [ "$DB_BACKEND" = "sqlite" ]; then
+echo "SQLite File: ${AIRFLOW_HOME}/airflow.db"
+echo "Connection String: sqlite:///${AIRFLOW_HOME}/airflow.db"
+else
+echo "PostgreSQL Host: ${POSTGRES_HOST}"
+echo "PostgreSQL Port: ${POSTGRES_PORT}"
+echo "PostgreSQL Database: ${POSTGRES_DB}"
+echo "PostgreSQL User: ${POSTGRES_USER}"
+echo "PostgreSQL Password: ${POSTGRES_PASSWORD}"
+echo "Connection String: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
+fi)
 
 Fernet Key: ${FERNET_KEY}
-
-Connection String:
-postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
 
 Configuration File: ${AIRFLOW_HOME}/airflow.cfg
 DAGs Directory: ${AIRFLOW_HOME}/dags
@@ -634,9 +693,13 @@ ${YELLOW}Access Information:${NC}
   🔑 Password: ${AIRFLOW_ADMIN_PASSWORD}
 
 ${YELLOW}Database:${NC}
-  🐘 PostgreSQL Database: ${POSTGRES_DB}
-  👤 DB User: ${POSTGRES_USER}
-  🔑 DB Password: ${POSTGRES_PASSWORD}
+$(if [ "$DB_BACKEND" = "sqlite" ]; then
+    echo "  🗄️  SQLite (dev/testing only): ${AIRFLOW_HOME}/airflow.db"
+else
+    echo "  🐘 PostgreSQL Database: ${POSTGRES_DB}"
+    echo "  👤 DB User: ${POSTGRES_USER}"
+    echo "  🔑 DB Password: ${POSTGRES_PASSWORD}"
+fi)
 
 ${YELLOW}Credentials File:${NC}
   📄 Location: ${CREDS_FILE}
