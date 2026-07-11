@@ -1,6 +1,7 @@
 import sys
 sys.path.insert(0, "/root/letterboxd-movie-rec")
 
+import os
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import json
@@ -187,6 +188,11 @@ def scrape_and_publish(**context):
         )
     )
     session.mount("https://", adapter)
+
+    proxy_url = os.getenv("PROXY_URL_SCHEDULE")
+    if proxy_url:
+        session.proxies = {"https": proxy_url, "http": proxy_url}
+        logger.info("Using proxy for whentostream scraping")
 
     all_streaming: dict[str, list[dict]] = {}
     all_theaters: dict[str, list[dict]] = {}

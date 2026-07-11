@@ -113,6 +113,30 @@ Where:
 
 The bag-of-words representation is constructed from concatenating overview text, genres, languages, and runtime tier, then stripping stopwords before vectorization.
 
+> **TODO:** the current `_precompute_movie_scores()` implementation only uses `vote_average` / `vote_count` for the Bayesian formula above — the bag-of-words / text-feature scoring described here is not yet wired in.
+
+
+### Content-Based Filtering — TF-IDF Taste Profile
+
+For users with rating history, content scoring goes beyond the global Bayesian average: a **personalized taste profile** is built from TF-IDF vectors over each movie's genres, themes, and nanogenres, then compared against every candidate via cosine similarity.
+
+**Building the profile** (`_tfidf_content_scores()`):
+```
+profile = Σ (rating - user_avg) × tfidf_vector(movie)   for each rated movie
+```
+Movies rated above the user's average contribute positively to the profile; movies rated below it contribute negatively — so a user's taste vector reflects what they liked *relative to their own scale*, not just what they watched.
+
+**Scoring candidates:**
+```
+content_score(movie) = cosine_similarity(profile, tfidf_vector(movie))
+```
+Scores are normalized to the `[0, 10]` scale to stay compatible with `cf_score` in the hybrid blend.
+
+- The TF-IDF matrix (genres + themes + nanogenres per movie) is precomputed once at training time and stored in the model bundle, so inference requires no recomputation.
+- Falls back to the Bayesian content score (above) when a user has no rated movies in the feature matrix — e.g. pure cold-start users, or users whose entire history predates the current movie catalog.
+
+This means the hybrid score for an active user blends three signals in practice: the SVD collaborative-filtering prediction, a personalized cosine-similarity taste match, and (as a fallback) global popularity.
+
 
 ### Engagement Weighting
 
@@ -262,14 +286,6 @@ get_user_recommendations ──► get_user_analytics
 
 Redis serves two distinct roles: **pub/sub message queue** for async recommendation delivery, and **ephemeral caching** for frequently read data.
 
-### Connection
-
-```
-Host:     REDIS_HOST     (default: localhost)
-Port:     REDIS_PORT     (default: 6379)
-Database: REDIS_DB       (default: 0)
-```
-
 ### Keys and Data Structures
 
 #### Pub/Sub Queues
@@ -325,24 +341,6 @@ Database: REDIS_DB       (default: 0)
 - **Read by**: `/recommend/top-picks` endpoint
 - **Content**: `{movie_id: {title, count, poster_url, ...}}`
 - **Retention**: Top 20 by selection count (trimmed monthly)
-
-### Redis Client (`messaging/redis_client.py`)
-
-```python
-class RedisClient:
-    def publish_recs_analytics(
-        self,
-        username: str,
-        recommendations: list,
-        analytics: dict
-    ) -> None:
-        payload = json.dumps({
-            "username": username,
-            "user_recommendation": recommendations,
-            "user_analytics": analytics
-        }, default=default_converter)  # handles numpy types
-        self.client.publish(REDIS_QUEUE_RECS, payload)
-```
 
 The middleware blocks on the queue with a timeout, returning a 504 if Airflow does not publish within the deadline.
 
@@ -481,21 +479,6 @@ The FastAPI middleware (`middleware/middleware.py`) bridges the frontend, Airflo
 | `GET` | `/calendar/releases` | Upcoming streaming + theatrical releases |
 | `GET` | `/health` | Health check |
 | `GET` | `/announcements` | System announcements |
-
-**Recommendation flow:**
-
-```
-POST /recommend/trigger {username}
-  └─► validate API key
-  └─► POST /dags/{dag_id}/dagRuns  →  Airflow
-                                         └─► scrape user
-                                         └─► load model
-                                         └─► generate recs
-                                         └─► compute analytics
-                                         └─► PUBLISH → Redis[recs]
-  └─► SUBSCRIBE Redis[recs]  (blocks with timeout)
-  └─► return JSON payload to frontend
-```
 
 
 ## Deployment

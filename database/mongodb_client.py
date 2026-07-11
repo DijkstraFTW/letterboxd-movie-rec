@@ -162,8 +162,13 @@ class MongoDBClient:
         """
         try:
             collection = self.client[self.database].movies
-            projection = {"_id": 0, "movie_title_formatted": 1, "movie_title": 1, "poster_url": 1,
-                          "lb_rating": 1, "genres": 1, "histogram": 1, "runtime": 1}
+            projection = {"_id": 0, "movie_title_formatted": 1, "movie_title": 1, "type": 1,
+                          "year_released": 1, "imdb_link": 1, "tmdb_link": 1, "imdb_id": 1,
+                          "tmdb_id": 1, "poster_url": 1, "lb_rating": 1, "histogram": 1,
+                          "genres": 1, "themes": 1, "nanogenres": 1, "production_countries": 1,
+                          "spoken_languages": 1, "popularity": 1, "overview": 1, "runtime": 1,
+                          "vote_average": 1, "vote_count": 1, "release_date": 1,
+                          "original_language": 1, "last_updated": 1}
             results = list(collection.find({"movie_title_formatted": {"$in": movie_titles}}, projection))
 
             logger.info(f"Fetched {len(results)} movies out of {len(movie_titles)} requested from MongoDB.")
