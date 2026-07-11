@@ -18,7 +18,7 @@ tzdata==2023.4
 urllib3==2.1.0
 apache-airflow
 redis==3.4.1
-curl_cffi
+curl_cffi>=0.15.0
 aiofiles
 fastapi==0.109.0
 uvicorn[standard]==0.27.0

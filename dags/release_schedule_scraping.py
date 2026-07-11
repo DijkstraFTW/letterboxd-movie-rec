@@ -92,15 +92,14 @@ def _discover_ids(session: requests.Session, gte: str, lte: str,
         if not data or not data.get("results"):
             break
         for r in data["results"]:
+            if not r.get("poster_path"):
+                continue
             movies[r["id"]] = {
                 "tmdb_id": r["id"],
                 "title": r["title"],
                 "original_title": r.get("original_title"),
                 "year": (r.get("release_date") or "")[:4] or None,
-                "poster_url": (
-                    f"https://image.tmdb.org/t/p/w500{r['poster_path']}"
-                    if r.get("poster_path") else None
-                ),
+                "poster_url": f"https://image.tmdb.org/t/p/w500{r['poster_path']}",
                 "popularity": r.get("popularity"),
                 "vote_average": r.get("vote_average"),
                 "url": f"https://www.themoviedb.org/movie/{r['id']}",
