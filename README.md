@@ -11,6 +11,7 @@ Under the hood this is a hybrid recommendation system: it scrapes the most activ
 
 ## Try it out
 
+> This project is no longer active, as Letterboxd now uses Cloudflare protection that blocks scraping.
 1. Go to the Webapp: [myletterboxdflicks.xyz](https://myletterboxdflicks.xyz)
 2. Input your Letterboxd username when prompted.
 3. Receive personalized recommendations and analytics based on your Letterboxd activity.
