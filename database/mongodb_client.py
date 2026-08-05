@@ -46,7 +46,6 @@ class MongoDBClient:
 
     @property
     def client(self):
-        """Property to access the MongoDB client."""
         if self._client is None:
             raise RuntimeError("MongoDBClient not properly initialized")
         return self._client

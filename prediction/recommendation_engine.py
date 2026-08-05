@@ -237,14 +237,7 @@ class RecommendationEngine:
         return scores
 
     def _compute_content_score(self, vote_average: float, vote_count: int) -> float:
-        """
-        Computes content score for a single movie using Bayesian average.
-        Used for cold start movies not in the training set.
-
-        :param vote_average: Average rating of the movie
-        :param vote_count: Number of votes/ratings
-        :return: Content score normalized to 0-10 scale
-        """
+        """Bayesian content score (0-10) for a single movie. Used for cold-start movies not in the training set."""
         if not hasattr(self, '_content_score_params'):
             logger.warning("Content score parameters not available, using defaults")
             C = 7.0  # Assume average rating of 7/10

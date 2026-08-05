@@ -21,14 +21,6 @@ class IPBlocker:
         block_duration: int = 3600,  # 1 hour in seconds
         time_window: int = 300,  # 5 minutes in seconds
     ):
-        """
-        Initialize the IP blocker.
-
-        Args:
-            max_attempts: Maximum failed attempts before blocking
-            block_duration: How long to block an IP (seconds)
-            time_window: Time window to count failed attempts (seconds)
-        """
         self.max_attempts = max_attempts
         self.block_duration = block_duration
         self.time_window = time_window
@@ -57,12 +49,7 @@ class IPBlocker:
         return False
 
     def record_failed_attempt(self, ip: str) -> bool:
-        """
-        Record a failed authentication attempt.
-
-        Returns:
-            True if the IP should be blocked, False otherwise
-        """
+        """Record a failed authentication attempt. Returns True if the IP was just blocked."""
         current_time = time.time()
 
         # Clean old attempts outside the time window
@@ -85,7 +72,7 @@ class IPBlocker:
         """Block an IP address for the configured duration."""
         block_expiry = time.time() + self.block_duration
         self.blocked_ips[ip] = block_expiry
-        logger.error(f"🚫 BLOCKED IP: {ip} until {time.ctime(block_expiry)}")
+        logger.error(f"Blocked IP: {ip} until {time.ctime(block_expiry)}")
 
     def unblock_ip(self, ip: str) -> None:
         """Manually unblock an IP address."""
@@ -154,12 +141,7 @@ class SecurityMonitor:
         }
 
     def check_suspicious_input(self, data: str) -> Dict[str, bool]:
-        """
-        Check input for suspicious patterns.
-
-        Returns:
-            Dictionary of detected patterns
-        """
+        """Check input for SQL injection, XSS, and path traversal patterns."""
         detected = {}
         data_lower = data.lower()
 
